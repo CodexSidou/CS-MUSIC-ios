@@ -74,7 +74,7 @@ async function boot() {
 boot().catch(err => {
   console.error(err);
   const z = document.createElement('div');
-  z.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#050505;color:#f88;font:14px monospace;padding:30px;text-align:center;z-index:9999';
+  z.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#04011B;color:#f88;font:14px monospace;padding:30px;text-align:center;z-index:9999';
   z.textContent = 'CS music failed to start: ' + (err && err.message ? err.message : err);
   document.body.appendChild(z);
 });

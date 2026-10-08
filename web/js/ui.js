@@ -77,7 +77,7 @@ function artworkHtml(t) {
   const art = t.artBlobUrl || t.artwork;
   const badge = SOURCE_BADGE[t.provider] ? `<span class="src-badge">${SOURCE_BADGE[t.provider]}</span>` : '';
   if (art) return `<img src="${esc(art)}" alt="" loading="lazy">${badge}`;
-  return `<span style="color:rgba(29,185,84,.5)">${ICONS.music}</span>${badge}`;
+  return `<span style="color:rgba(124,89,251,.5)">${ICONS.music}</span>${badge}`;
 }
 
 function rowHtml(t, ctx, idx, extra = '') {
@@ -97,7 +97,7 @@ function rowHtml(t, ctx, idx, extra = '') {
 function hcardHtml(t, ctx, idx) {
   const art = t.artBlobUrl || t.artwork;
   return `<div class="hcard" data-ctx="${esc(ctx)}" data-idx="${idx}" data-id="${esc(t.id)}">
-    <div class="art">${art ? `<img src="${esc(art)}" alt="" loading="lazy">` : `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:rgba(29,185,84,.5)">${ICONS.music}</div>`}</div>
+    <div class="art">${art ? `<img src="${esc(art)}" alt="" loading="lazy">` : `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:rgba(124,89,251,.5)">${ICONS.music}</div>`}</div>
     <div class="t">${esc(t.title)}</div><div class="s">${esc(t.artist || '')}</div>
   </div>`;
 }
@@ -610,7 +610,7 @@ function updateMini() {
   $('#mini-title').textContent = t.title;
   $('#mini-artist').textContent = t.artist || (SOURCE_BADGE[t.provider] || '');
   const art = t.artBlobUrl || t.artwork;
-  $('#mini-art').innerHTML = art ? `<img src="${esc(art)}" alt="">` : `<span style="color:rgba(29,185,84,.5)">${ICONS.music}</span>`;
+  $('#mini-art').innerHTML = art ? `<img src="${esc(art)}" alt="">` : `<span style="color:rgba(124,89,251,.5)">${ICONS.music}</span>`;
   $('#mini-toggle').innerHTML = player.loading && player.playing === false && !mediaEl().src ? '<span class="spin"></span>' : (player.playing ? ICONS.pause : ICONS.play);
 }
 
