@@ -175,12 +175,15 @@ async function rotate(stickyGet, stickySet, bases, path, timeoutMs = 7000) {
   if (s) order.push(s);
   for (const b of bases) if (b !== s) order.push(b);
   let lastErr;
-  for (const base of order) {
-    try {
-      const d = await jget(base + path, timeoutMs);
-      stickySet(base);
-      return d;
-    } catch (e) { lastErr = e; }
+  for (let i = 0; i < order.length; i++) {
+    const tries = i === 0 ? 2 : 1;
+    for (let t = 0; t < tries; t++) {
+      try {
+        const d = await jget(order[i] + path, timeoutMs);
+        stickySet(order[i]);
+        return d;
+      } catch (e) { lastErr = e; }
+    }
   }
   throw lastErr || new Error('all instances failed');
 }
@@ -260,25 +263,60 @@ export const archive = {
   }
 };
 
+function rewriteGoogle(url, apiBase) {
+  if (!url || !apiBase || !url.includes('googlevideo.com/videoplayback')) return url;
+  const query = url.split('videoplayback?')[1] || '';
+  return apiBase + '/videoplayback?' + query;
+}
+
+function hostBonus(url, apiBase) {
+  if (!url) return 0;
+  try {
+    const h = new URL(url).host;
+    if (apiBase && h === new URL(apiBase).host) return 25;
+    if (h.includes('piped')) return 25;
+    if (h.includes('odycdn')) return -2;
+  } catch { /* ignore */ }
+  return 0;
+}
+
+function mimePenalty(mime) {
+  const m = (mime || '').toLowerCase();
+  if (m.includes('mpegurl') || m.includes('m3u8') || m.includes('hls')) return -30;
+  return 0;
+}
+
 async function resolveCandidates(ytId) {
   const out = [];
   try {
     const d = await rotate(() => pipedSticky, v => { pipedSticky = v; }, PIPED_INSTANCES, `/streams/${ytId}`, 9000);
+    const apiBase = pipedSticky;
     for (const a of (d.audioStreams || [])) {
-      out.push({ url: a.url, mime: a.mimeType || '', audioOnly: true, score: scoreAudio(a.mimeType || '', a.bitrate || 0) });
+      const url = rewriteGoogle(a.url, apiBase);
+      out.push({ url: url, mime: a.mimeType || '', audioOnly: true, score: scoreAudio(a.mimeType || '', a.bitrate || 0) + hostBonus(url, apiBase) + mimePenalty(a.mimeType || '') });
     }
     for (const v of (d.videoStreams || [])) {
-      if (!v.videoOnly) out.push({ url: v.url, mime: v.mimeType || '', audioOnly: false, score: scoreAudio(v.mimeType || '', 0) - 5 });
+      if (!v.videoOnly) {
+        const url = rewriteGoogle(v.url, apiBase);
+        out.push({ url: url, mime: v.mimeType || '', audioOnly: false, score: scoreAudio(v.mimeType || '', 0) - 5 + hostBonus(url, apiBase) + mimePenalty(v.mimeType || '') });
+      }
     }
   } catch { /* try invidious */ }
   if (!out.length) {
     try {
       const d = await rotate(() => invidiousSticky, v => { invidiousSticky = v; }, INVIDIOUS_INSTANCES, `/api/v1/videos/${ytId}`, 9000);
+      const apiBase = invidiousSticky;
       for (const f of (d.adaptiveFormats || [])) {
-        if ((f.type || '').startsWith('audio')) out.push({ url: f.url, mime: f.type || '', audioOnly: true, score: scoreAudio(f.type || '', f.bitrate || 0) });
+        if ((f.type || '').startsWith('audio')) {
+          const url = rewriteGoogle(f.url, apiBase);
+          out.push({ url: url, mime: f.type || '', audioOnly: true, score: scoreAudio(f.type || '', f.bitrate || 0) + hostBonus(url, apiBase) + mimePenalty(f.type || '') });
+        }
       }
       for (const f of (d.formatStreams || [])) {
-        if (f.type && f.type.includes('mp4')) out.push({ url: f.url, mime: f.type, audioOnly: false, score: scoreAudio(f.type, 0) - 5 });
+        if (f.type && f.type.includes('mp4')) {
+          const url = rewriteGoogle(f.url, apiBase);
+          out.push({ url: url, mime: f.type, audioOnly: false, score: scoreAudio(f.type, 0) - 5 + hostBonus(url, apiBase) + mimePenalty(f.type) });
+        }
       }
     } catch { /* both failed */ }
   }

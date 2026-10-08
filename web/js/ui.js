@@ -410,7 +410,8 @@ function probeDurations() {
 export async function saveOnline(track, onProgress) {
   if (track.file) return true;
   if (!state.online) { toast('You are offline', true); return false; }
-  try {
+  const attempt = async (fresh) => {
+    if (fresh) { track._resolved = null; track._resolvedAt = 0; }
     const url = await resolveStream(track);
     const blob = await fetchWithProgress(url, onProgress);
     track.file = blob;
@@ -435,9 +436,16 @@ export async function saveOnline(track, onProgress) {
     await db.putTrack(track);
     await refreshLibrary();
     return true;
-  } catch (e) {
-    toast('This stream cannot be saved offline', true);
-    return false;
+  };
+  try {
+    return await attempt(false);
+  } catch {
+    try {
+      return await attempt(true);
+    } catch {
+      toast('This stream cannot be saved offline', true);
+      return false;
+    }
   }
 }
 
