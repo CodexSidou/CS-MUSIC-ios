@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS music — Your Music. Your Mood. Your Player.</title>
+<meta name="description" content="Native Android music player with mood AI, YouTube downloads, real-time visualizer, and smart player modes. Zero servers. Zero tracking.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#050505;--surface:#0c0c0c;--surface2:#141414;--green:#1DB954;--green2:#1ed760;--green-glow:rgba(29,185,84,.15);--purple:#a855f7;--cyan:#22d3ee;--pink:#f472b6;--orange:#fb923c;--text:#f0f0f0;--text2:#888;--text3:#444;--border:rgba(29,185,84,.1);--card:rgba(12,12,12,.85);--glass:rgba(12,12,25,.6)}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;line-height:1.6}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.025}
+#progress{position:fixed;top:0;left:0;height:2px;width:0;background:linear-gradient(90deg,var(--green),var(--cyan),var(--green2));z-index:10001;transition:width .3s}
+#particle-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,28px);transition:all .3s;border-bottom:1px solid transparent}
+nav.solid{background:rgba(5,5,5,.92);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom-color:var(--border)}
+.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--green),#059669);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff}
+.nav-name{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.3px}
+.nav-name span{color:var(--green)}
+.nav-links{display:flex;gap:6px;align-items:center}
+.nav-links a{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--text2);text-decoration:none;transition:all .2s}
+.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.nav-dl{padding:8px 20px;border-radius:10px;font-size:13px;font-weight:600;background:linear-gradient(135deg,var(--green),#059669);color:#fff!important;text-decoration:none;border:none;cursor:pointer;transition:all .2s}
+.nav-dl:hover{box-shadow:0 4px 20px rgba(29,185,84,.35);transform:translateY(-1px)}
+.hamburger{display:none;background:none;border:none;color:var(--text);cursor:pointer;padding:8px;z-index:1001}
+.hamburger span{display:block;width:20px;height:2px;background:var(--text);margin:4px 0;border-radius:2px;transition:all .3s}
+#mobile-nav{display:none;position:fixed;top:60px;left:0;right:0;z-index:999;background:rgba(5,5,5,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 20px 20px}
+#mobile-nav.open{display:block}
+#mobile-nav a{display:block;padding:12px 14px;border-radius:10px;font-size:15px;color:var(--text2);text-decoration:none;margin-bottom:4px}
+#mobile-nav a:hover{background:rgba(255,255,255,.04);color:var(--text)}
+
+.sec{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:90px 24px 60px}
+.sr{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.sr.vis{opacity:1;transform:none}
+.grad{background:linear-gradient(135deg,var(--green),var(--cyan),var(--green2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;transition:all .25s;cursor:pointer;border:none}
+.btn-fill{background:linear-gradient(135deg,var(--green),#059669);color:#fff}
+.btn-fill:hover{box-shadow:0 6px 28px rgba(29,185,84,.4);transform:translateY(-2px)}
+.btn-ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{background:rgba(255,255,255,.08);border-color:var(--green)}
+
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:100px 24px 60px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;overflow:hidden}
+.hero-glow{position:absolute;border-radius:50%;filter:blur(80px);opacity:.15}
+.hero-glow.a{width:500px;height:500px;background:var(--green);top:-10%;left:-5%}
+.hero-glow.b{width:400px;height:400px;background:var(--cyan);bottom:0;right:-5%}
+.hero-glow.c{width:300px;height:300px;background:var(--purple);top:40%;left:50%;transform:translate(-50%,-50%)}
+.hero-inner{position:relative;z-index:1;max-width:800px}
+.hero-pill{display:inline-flex;align-items:center;gap:8px;padding:6px 16px 6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--glass);font-size:13px;color:var(--text2);margin-bottom:28px;backdrop-filter:blur(10px)}
+.hero-pill code{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--green2)}
+.live{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hero h1{font-size:clamp(34px,6vw,64px);font-weight:900;line-height:1.1;letter-spacing:-1.5px;margin-bottom:20px}
+.hero-desc{font-size:clamp(15px,2vw,18px);color:var(--text2);line-height:1.7;margin-bottom:32px;max-width:600px;margin-left:auto;margin-right:auto}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
+.hero-nums{display:flex;gap:40px;justify-content:center;flex-wrap:wrap}
+.hero-num{text-align:center}
+.hero-num .n{font-size:28px;font-weight:800;color:var(--text)}
+.hero-num .l{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+
+.feat-sec{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:40px 24px 90px}
+.feat-sec h2{font-size:clamp(28px,4vw,42px);font-weight:800;text-align:center;margin-bottom:8px;letter-spacing:-1px}
+.feat-sec .sub{text-align:center;color:var(--text2);font-size:15px;margin-bottom:40px}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.feat-card{padding:28px 24px;border-radius:16px;border:1px solid var(--border);background:var(--card);transition:all .3s;position:relative;overflow:hidden}
+.feat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan));opacity:0;transition:opacity .3s}
+.feat-card:hover{border-color:rgba(29,185,84,.25);transform:translateY(-4px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.feat-card:hover::before{opacity:1}
+.feat-ico{font-size:28px;margin-bottom:14px}
+.feat-card h3{font-size:16px;font-weight:700;margin-bottom:6px;color:var(--text)}
+.feat-card p{font-size:13px;color:var(--text2);line-height:1.6}
+
+.phone-sec{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:90px 24px;display:flex;gap:48px;align-items:center;perspective:1200px}
+.phone-sec .info{flex:1}
+.phone-sec .info h2{font-size:clamp(28px,4vw,40px);font-weight:800;margin-bottom:16px;letter-spacing:-1px;line-height:1.15}
+.phone-sec .info p{font-size:15px;color:var(--text2);line-height:1.7;margin-bottom:24px}
+.phone-sec .info .list{display:flex;flex-direction:column;gap:12px}
+.phone-sec .info .list-item{display:flex;gap:12px;align-items:start}
+.phone-sec .info .list-item .ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:var(--green-glow);border:1px solid rgba(29,185,84,.15)}
+.phone-sec .info .list-item h4{font-size:14px;font-weight:700;margin-bottom:2px}
+.phone-sec .info .list-item span{font-size:12px;color:var(--text2);line-height:1.5}
+.phone-wrap{flex-shrink:0;transform-style:preserve-3d;transition:transform .15s ease-out}
+.phone{position:relative;width:280px;height:560px;border-radius:36px;border:2px solid rgba(29,185,84,.2);background:var(--surface);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 0 1px rgba(29,185,84,.08)}
+.phone-notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:100px;height:24px;background:var(--bg);border-radius:0 0 16px 16px;z-index:20;display:flex;align-items:center;justify-content:center}
+.phone-dot{width:6px;height:6px;border-radius:50%;background:var(--text3)}
+.phone-screen{position:absolute;inset:0;overflow:hidden;padding:32px 16px 16px}
+.ps-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.ps-logo{display:flex;align-items:center;gap:6px}
+.ps-logo-icon{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--green),#059669);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.ps-logo-text{font-size:13px;font-weight:800}
+.ps-gear{font-size:16px;color:var(--text3)}
+.ps-greeting{font-size:18px;font-weight:800;margin-bottom:4px}
+.ps-sub{font-size:11px;color:var(--text3);margin-bottom:16px}
+.ps-mood-row{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;scrollbar-width:none}
+.ps-mood-row::-webkit-scrollbar{display:none}
+.ps-mood{flex-shrink:0;padding:6px 12px;border-radius:999px;font-size:10px;font-weight:600;border:1px solid var(--border);color:var(--text3);transition:all .2s;cursor:pointer}
+.ps-mood.on{background:var(--green);color:#fff;border-color:var(--green)}
+.ps-track{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);margin-bottom:8px;transition:all .2s}
+.ps-track.playing{border-color:rgba(29,185,84,.3);background:rgba(29,185,84,.05)}
+.ps-track-art{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ps-track-info{flex:1;min-width:0}
+.ps-track-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ps-track-artist{font-size:10px;color:var(--text3)}
+.ps-track-dur{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.ps-eq{display:flex;align-items:end;gap:2px;height:20px;margin-left:8px}
+.ps-eq-bar{width:3px;border-radius:2px;background:var(--green);animation:eqBar .8s ease-in-out infinite alternate}
+.ps-eq-bar:nth-child(1){height:8px;animation-delay:0s}
+.ps-eq-bar:nth-child(2){height:14px;animation-delay:.15s}
+.ps-eq-bar:nth-child(3){height:6px;animation-delay:.3s}
+.ps-eq-bar:nth-child(4){height:18px;animation-delay:.1s}
+.ps-eq-bar:nth-child(5){height:10px;animation-delay:.25s}
+@keyframes eqBar{0%{height:4px}100%{height:100%}}
+.ps-now{margin-top:12px;padding:14px;border-radius:14px;background:linear-gradient(135deg,rgba(29,185,84,.12),rgba(29,185,84,.03));border:1px solid rgba(29,185,84,.15)}
+.ps-now-label{font-size:9px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.ps-now-title{font-size:14px;font-weight:800;margin-bottom:2px}
+.ps-now-artist{font-size:11px;color:var(--text3);margin-bottom:10px}
+.ps-progress{height:3px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-bottom:4px}
+.ps-progress-fill{height:100%;width:65%;background:var(--green);border-radius:2px}
+.ps-times{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.ps-controls{display:flex;align-items:center;justify-content:center;gap:20px;margin-top:12px}
+.ps-ctrl{font-size:16px;color:var(--text2);cursor:pointer;transition:color .2s}
+.ps-ctrl.play{font-size:28px;color:var(--green)}
+.ps-glow{position:absolute;top:50%;left:50%;width:300px;height:300px;background:radial-gradient(circle,rgba(29,185,84,.08),transparent 70%);transform:translate(-50%,-50%);pointer-events:none;filter:blur(40px)}
+
+.mood-sec{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:90px 24px;text-align:center}
+.mood-sec h2{font-size:clamp(28px,4vw,42px);font-weight:800;margin-bottom:8px;letter-spacing:-1px}
+.mood-sec .sub{color:var(--text2);font-size:15px;margin-bottom:48px}
+.mood-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.mood-card{padding:24px 16px;border-radius:16px;border:1px solid var(--border);background:var(--card);transition:all .3s;text-align:center}
+.mood-card:hover{transform:translateY(-4px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.mood-emoji{font-size:32px;margin-bottom:10px}
+.mood-name{font-size:14px;font-weight:700;margin-bottom:4px}
+.mood-desc{font-size:11px;color:var(--text3);line-height:1.5}
+.mood-card.night{border-color:rgba(99,102,241,.15)}.mood-card.night:hover{border-color:rgba(99,102,241,.3)}
+.mood-card.upbeat{border-color:rgba(251,191,36,.15)}.mood-card.upbeat:hover{border-color:rgba(251,191,36,.3)}
+.mood-card.bright{border-color:rgba(29,185,84,.15)}.mood-card.bright:hover{border-color:rgba(29,185,84,.3)}
+.mood-card.chill{border-color:rgba(34,211,238,.15)}.mood-card.chill:hover{border-color:rgba(34,211,238,.3)}
+.mood-card.mellow{border-color:rgba(168,85,247,.15)}.mood-card.mellow:hover{border-color:rgba(168,85,247,.3)}
+
+.tech-sec{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:60px 24px 90px;text-align:center}
+.tech-sec h2{font-size:clamp(24px,3.5vw,36px);font-weight:800;margin-bottom:32px;letter-spacing:-1px}
+.tech-row{display:flex;justify-content:center;gap:16px;flex-wrap:wrap}
+.tech-pill{padding:8px 20px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:13px;font-weight:600;color:var(--text2);transition:all .2s}
+.tech-pill:hover{border-color:rgba(29,185,84,.25);color:var(--text)}
+
+.dl-sec{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:90px 24px;text-align:center}
+.dl-sec h2{font-size:clamp(28px,4vw,42px);font-weight:800;margin-bottom:8px;letter-spacing:-1px}
+.dl-sec .sub{color:var(--text2);font-size:15px;margin-bottom:40px}
+.dl-card{max-width:480px;margin:0 auto;padding:40px 32px;border-radius:20px;border:1px solid rgba(29,185,84,.2);background:var(--card);position:relative;overflow:hidden}
+.dl-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan),var(--green2))}
+.dl-card .icon{font-size:48px;margin-bottom:16px}
+.dl-card h3{font-size:22px;font-weight:800;margin-bottom:4px}
+.dl-card .ver{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green);margin-bottom:16px}
+.dl-card .specs{font-size:12px;color:var(--text3);margin-bottom:20px;line-height:1.8}
+.dl-card .btn{width:100%;justify-content:center;font-size:16px;padding:16px 32px}
+
+footer{position:relative;z-index:1;text-align:center;padding:40px 24px;border-top:1px solid var(--border)}
+footer .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px}
+footer .brand-icon{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--green),#059669);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+footer .brand span{font-weight:800;font-size:14px}
+footer p{font-size:12px;color:var(--text3);margin-bottom:16px}
+footer .links{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+footer .links a{font-size:12px;color:var(--text2);text-decoration:none;transition:color .2s}
+footer .links a:hover{color:var(--green)}
+
+@media(max-width:900px){.feat-grid{grid-template-columns:1fr 1fr}.phone-sec{flex-direction:column;gap:32px}.mood-grid{grid-template-columns:repeat(3,1fr)}.phone-wrap{transform:scale(.85)}}
+@media(max-width:640px){.nav-links{display:none}.hamburger{display:block}.feat-grid{grid-template-columns:1fr}.hero h1{font-size:32px;letter-spacing:-.5px}.hero-nums{gap:24px}.hero{padding:80px 16px 40px;min-height:auto}.sec,.feat-sec,.phone-sec,.mood-sec,.tech-sec,.dl-sec{padding-left:16px;padding-right:16px}.mood-grid{grid-template-columns:repeat(2,1fr)}.phone-wrap{transform:scale(.7)}.phone-sec .info h2{font-size:26px}}
+</style>
+</head>
+<body>
+<canvas id="particle-canvas"></canvas>
+<div id="progress"></div>
+<nav id="topnav">
+  <a class="nav-brand" href="#"><div class="nav-icon">C</div><span class="nav-name">CS <span>music</span></span></a>
+  <div class="nav-links" id="navLinks">
+    <a href="#features">Features</a>
+    <a href="#player">Player</a>
+    <a href="#moods">Moods</a>
+    <a href="#tech">Tech</a>
+    <a href="#download" class="nav-dl">Download</a>
+  </div>
+  <button class="hamburger" id="burger" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+<div id="mobile-nav">
+  <a href="#features">Features</a>
+  <a href="#player">Player</a>
+  <a href="#moods">Moods</a>
+  <a href="#tech">Tech</a>
+  <a href="#download">Download</a>
+</div>
+
+<section class="hero" id="top">
+  <div class="hero-bg">
+    <div class="hero-glow a"></div><div class="hero-glow b"></div><div class="hero-glow c"></div>
+  </div>
+  <div class="hero-inner">
+    <div class="hero-pill sr"><span class="live"></span><code>v1.0.2</code>&mdash; mood AI inside</div>
+    <h1 class="sr">Your music.<br><span class="grad">Your mood.</span><br>Your player.</h1>
+    <p class="hero-desc sr">Native Kotlin music player that understands your music. Mood analysis, YouTube downloads, real-time visualizer, smart player modes. Zero servers, zero tracking.</p>
+    <div class="hero-btns sr">
+      <a href="https://github.com/rkkizar777-design/kiz-player-apk/releases/latest/download/kiz-player.apk" class="btn btn-fill" data-apk>Download APK</a>
+      <a href="#features" class="btn btn-ghost">Explore features</a>
+    </div>
+    <div class="hero-nums sr">
+      <div class="hero-num"><div class="n" data-count="0">0</div><div class="l">Servers</div></div>
+      <div class="hero-num"><div class="n" data-count="0">0</div><div class="l">Tracking</div></div>
+      <div class="hero-num"><div class="n" data-count="5">0</div><div class="l">Moods</div></div>
+      <div class="hero-num"><div class="n" data-count="3">0</div><div class="l">Modes</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="feat-sec" id="features">
+  <h2 class="sr">Built different.</h2>
+  <p class="sub sr">Every feature designed around your music, not someone else's algorithm.</p>
+  <div class="feat-grid">
+    <div class="feat-card sr">
+      <div class="feat-ico">&#127925;</div>
+      <h3>Mood AI</h3>
+      <p>Analyzes BPM, energy, brightness, darkness, and valence of every track. Classifies into moods automatically.</p>
+    </div>
+    <div class="feat-card sr">
+      <div class="feat-ico">&#128249;</div>
+      <h3>YouTube Downloads</h3>
+      <p>Paste a link or search in-app. Built-in yt-dlp engine downloads audio, converts to M4A, adds to library.</p>
+    </div>
+    <div class="feat-card sr">
+      <div class="feat-ico">&#127926;</div>
+      <h3>Visualizer</h3>
+      <p>Real-time FFT bass visualizer with equalizer bars that move with the beat. Every song becomes a show.</p>
+    </div>
+    <div class="feat-card sr">
+      <div class="feat-ico">&#128661;</div>
+      <h3>Player Modes</h3>
+      <p>Car, Gym, Sleep, and custom modes. Each adapts queue, energy levels, and interface to your activity.</p>
+    </div>
+    <div class="feat-card sr">
+      <div class="feat-ico">&#128203;</div>
+      <h3>Smart Queues</h3>
+      <p>Time-of-day recommendations. Night vibes at midnight, high energy at the gym, mellow for winding down.</p>
+    </div>
+    <div class="feat-card sr">
+      <div class="feat-ico">&#128241;</div>
+      <h3>Home Widgets</h3>
+      <p>Player control widget and listening stats widget. Control music and see habits without opening the app.</p>
+    </div>
+  </div>
+</section>
+
+<section class="phone-sec" id="player">
+  <div class="info">
+    <div class="sr">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);letter-spacing:3px;text-transform:uppercase;margin-bottom:16px;display:inline-flex;align-items:center;gap:8px"><span style="width:24px;height:1px;background:var(--green)"></span>Player</div>
+      <h2>Beautiful inside<br>and out</h2>
+      <p>Material3 design with OLED black theme. Album art dominance, fluid animations, and a visualizer that responds to every beat.</p>
+      <div class="list">
+        <div class="list-item"><div class="ico">&#9889;</div><div><h4>ExoPlayer / Media3</h4><span>Hardware-accelerated playback with gapless transitions</span></div></div>
+        <div class="list-item"><div class="ico">&#128269;</div><div><h4>Online + Local Search</h4><span>Search YouTube, iTunes, or your own library</span></div></div>
+        <div class="list-item"><div class="ico">&#128164;</div><div><h4>Sleep Timer</h4><span>Auto-stop after 15, 30, 60 minutes or end of track</span></div></div>
+        <div class="list-item"><div class="ico">&#128241;</div><div><h4>Share to Download</h4><span>Share YouTube links from any app &mdash; auto-downloads</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="phone-wrap" id="phone3d">
+    <div class="phone">
+      <div class="phone-notch"><div class="phone-dot"></div></div>
+      <div class="phone-screen">
+        <div class="ps-header">
+          <div class="ps-logo"><div class="ps-logo-icon">C</div><span class="ps-logo-text">CS music</span></div>
+          <span class="ps-gear">&#9881;</span>
+        </div>
+        <div class="ps-greeting">Good evening</div>
+        <div class="ps-sub">Your mood tonight: Chill</div>
+        <div class="ps-mood-row">
+          <span class="ps-mood">&#127769; Night</span>
+          <span class="ps-mood on">&#127925; Chill</span>
+          <span class="ps-mood">&#9889; Upbeat</span>
+          <span class="ps-mood">&#127774; Bright</span>
+          <span class="ps-mood">&#128156; Mellow</span>
+        </div>
+        <div class="ps-track playing">
+          <div class="ps-track-art" style="background:linear-gradient(135deg,#1DB954,#059669)">&#127925;</div>
+          <div class="ps-track-info"><div class="ps-track-name">Blinding Lights</div><div class="ps-track-artist">The Weeknd</div></div>
+          <div class="ps-eq"><div class="ps-eq-bar"></div><div class="ps-eq-bar"></div><div class="ps-eq-bar"></div><div class="ps-eq-bar"></div><div class="ps-eq-bar"></div></div>
+        </div>
+        <div class="ps-track">
+          <div class="ps-track-art" style="background:linear-gradient(135deg,#a855f7,#7c3aed)">&#127926;</div>
+          <div class="ps-track-info"><div class="ps-track-name">Starboy</div><div class="ps-track-artist">The Weeknd</div></div>
+          <div class="ps-track-dur">3:50</div>
+        </div>
+        <div class="ps-track">
+          <div class="ps-track-art" style="background:linear-gradient(135deg,#22d3ee,#0891b2)">&#127911;</div>
+          <div class="ps-track-info"><div class="ps-track-name">Midnight City</div><div class="ps-track-artist">M83</div></div>
+          <div class="ps-track-dur">4:03</div>
+        </div>
+        <div class="ps-now">
+          <div class="ps-now-label">&#9654; Now Playing</div>
+          <div class="ps-now-title">Blinding Lights</div>
+          <div class="ps-now-artist">The Weeknd &middot; After Hours</div>
+          <div class="ps-progress"><div class="ps-progress-fill"></div></div>
+          <div class="ps-times"><span>2:34</span><span>3:52</span></div>
+        </div>
+        <div class="ps-controls">
+          <span class="ps-ctrl">&#9198;</span>
+          <span class="ps-ctrl">&#9664;&#65039;</span>
+          <span class="ps-ctrl play">&#9654;&#65039;</span>
+          <span class="ps-ctrl">&#9654;&#65039;</span>
+          <span class="ps-ctrl">&#128257;</span>
+        </div>
+      </div>
+    </div>
+    <div class="ps-glow"></div>
+  </div>
+</section>
+
+<section class="mood-sec" id="moods">
+  <h2 class="sr">Understands your <span class="grad">mood</span></h2>
+  <p class="sub sr">Every song analyzed. Every queue built for the moment.</p>
+  <div class="mood-grid">
+    <div class="mood-card night sr"><div class="mood-emoji">&#127769;</div><div class="mood-name">Night</div><div class="mood-desc">Low energy, dark tones. Midnight listening.</div></div>
+    <div class="mood-card upbeat sr"><div class="mood-emoji">&#9889;</div><div class="mood-name">Upbeat</div><div class="mood-desc">High BPM, fast energy. Gym and run time.</div></div>
+    <div class="mood-card bright sr"><div class="mood-emoji">&#127774;</div><div class="mood-name">Bright</div><div class="mood-desc">Major key, positive vibes. Morning sunshine.</div></div>
+    <div class="mood-card chill sr"><div class="mood-emoji">&#128153;</div><div class="mood-name">Chill</div><div class="mood-desc">Mid tempo, relaxed. Work and focus.</div></div>
+    <div class="mood-card mellow sr"><div class="mood-emoji">&#128156;</div><div class="mood-name">Mellow</div><div class="mood-desc">Soft, low energy. Wind down and sleep.</div></div>
+  </div>
+</section>
+
+<section class="tech-sec" id="tech">
+  <h2 class="sr">Built with <span class="grad">real tech</span></h2>
+  <div class="tech-row sr">
+    <div class="tech-pill">Kotlin</div>
+    <div class="tech-pill">Jetpack Compose</div>
+    <div class="tech-pill">Material3</div>
+    <div class="tech-pill">Media3 / ExoPlayer</div>
+    <div class="tech-pill">Room DB</div>
+    <div class="tech-pill">Coil</div>
+    <div class="tech-pill">yt-dlp</div>
+    <div class="tech-pill">Piped API</div>
+    <div class="tech-pill">iTunes API</div>
+    <div class="tech-pill">MVVM</div>
+  </div>
+</section>
+
+<section class="dl-sec" id="download">
+  <h2 class="sr">Get CS music</h2>
+  <p class="sub sr">Free. No login. No ads. No servers.</p>
+  <div class="dl-card sr">
+    <div class="icon">&#127925;</div>
+    <h3>CS music</h3>
+    <div class="ver">v1.0.2</div>
+    <div class="specs" data-specs>arm64-v8a &middot; Android 8.0+ (API 26)<br>38.8 MB &middot; Zero tracking</div>
+    <a href="https://github.com/rkkizar777-design/kiz-player-apk/releases/latest/download/kiz-player.apk" class="btn btn-fill" data-apk>Download APK</a>
+  </div>
+</section>
+
+<footer>
+  <div class="brand"><div class="brand-icon">C</div><span>CS music</span></div>
+  <p>Built by <a href="https://github.com/rkkizar777-design" style="color:var(--green);text-decoration:none">KIZAR</a> &middot; From Algiers &middot; Zero servers, zero tracking, zero BS</p>
+  <div class="links">
+    <a href="https://github.com/rkkizar777-design/kiz-player-apk">GitHub</a>
+    <a href="https://github.com/rkkizar777-design/kiz-player-apk/releases">Releases</a>
+    <a href="https://github.com/rkkizar777-design/kiz-player-apk/issues">Report Bug</a>
+    <a href="https://portfolio-7v27jfiiq-razikmakmak-1648s-projects.vercel.app">Portfolio</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var c=document.getElementById('particle-canvas'),ctx=c.getContext('2d');
+  var W,H,particles=[],mouse={x:-1000,y:-1000};
+  var colors=['rgba(29,185,84,','rgba(34,211,238,','rgba(168,85,247,','rgba(30,215,96,'];
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight}
+  resize();window.addEventListener('resize',resize);
+  document.addEventListener('mousemove',function(e){mouse.x=e.clientX;mouse.y=e.clientY});
+  for(var i=0;i<80;i++){
+    particles.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()*2+1,color:colors[Math.floor(Math.random()*colors.length)]});
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for(var i=0;i<particles.length;i++){
+      var p=particles[i];
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+      var dx=mouse.x-p.x,dy=mouse.y-p.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<150){var force=(150-dist)/150;p.x-=dx*force*.01;p.y-=dy*force*.01}
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=p.color+(.5+Math.sin(Date.now()*.001+i)*.2).toFixed(2)+')';
+      ctx.fill();
+      for(var j=i+1;j<particles.length;j++){
+        var q=particles[j],ddx=p.x-q.x,ddy=p.y-q.y,dist2=Math.sqrt(ddx*ddx+ddy*ddy);
+        if(dist2<120){
+          ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);
+          ctx.strokeStyle=p.color+((1-dist2/120)*.15).toFixed(3)+')';
+          ctx.lineWidth=.5;ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+(function(){
+  var wrap=document.getElementById('phone3d');
+  if(!wrap)return;
+  var rect;
+  function updateRect(){rect=wrap.getBoundingClientRect()}
+  updateRect();window.addEventListener('resize',updateRect);
+  document.addEventListener('mousemove',function(e){
+    if(!rect)return;
+    var cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+    var dx=(e.clientX-cx)/(rect.width/2);
+    var dy=(e.clientY-cy)/(rect.height/2);
+    dx=Math.max(-1,Math.min(1,dx));dy=Math.max(-1,Math.min(1,dy));
+    wrap.style.transform='rotateX('+(-dy*5)+'deg) rotateY('+(dx*8)+'deg)';
+  });
+  var lastScroll=0;
+  window.addEventListener('scroll',function(){
+    var now=Date.now();if(now-lastScroll<16)return;lastScroll=now;
+    updateRect();if(!rect)return;
+    var vis=rect.top<window.innerHeight&&rect.bottom>0;
+    if(!vis){wrap.style.transform='rotateX(0) rotateY(0)';return}
+    var progress=(window.innerHeight-rect.top)/(window.innerHeight+rect.height);
+    var floatY=Math.sin(progress*Math.PI*2)*6;
+    wrap.style.transform='rotateX('+(-3+floatY)+'deg) rotateY(0)';
+  });
+})();
+
+document.getElementById('burger').onclick=function(){
+  this.classList.toggle('open');
+  document.getElementById('mobile-nav').classList.toggle('open');
+};
+document.querySelectorAll('#mobile-nav a').forEach(function(a){
+  a.onclick=function(){
+    document.getElementById('burger').classList.remove('open');
+    document.getElementById('mobile-nav').classList.remove('open');
+  }
+});
+
+window.addEventListener('scroll',function(){
+  document.getElementById('topnav').classList.toggle('solid',window.scrollY>40);
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('progress').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+
+var obs=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('vis')});
+},{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.sr').forEach(function(el){obs.observe(el)});
+
+(function(){
+  var counters=document.querySelectorAll('[data-count]');
+  var animated=false;
+  function animateCounters(){
+    if(animated)return;animated=true;
+    counters.forEach(function(el){
+      var target=parseInt(el.getAttribute('data-count'));
+      if(target===0){el.textContent='0';return}
+      var current=0;var step=Math.ceil(target/40);
+      var interval=setInterval(function(){
+        current+=step;if(current>=target){current=target;clearInterval(interval)}
+        el.textContent=current;
+      },30);
+    });
+  }
+  var heroObs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){if(e.isIntersecting)animateCounters()});
+  },{threshold:0.5});
+  var heroNums=document.querySelector('.hero-nums');
+  if(heroNums)heroObs.observe(heroNums);
+})();
+
+(function(){
+  var ua=navigator.userAgent;
+  var iOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(!iOS)return;
+  document.querySelectorAll('a[data-apk]').forEach(function(a){
+    a.setAttribute('href','web/');
+    a.textContent='Open iPhone App';
+  });
+  var specs=document.querySelector('[data-specs]');
+  if(specs)specs.innerHTML='Works in Safari &middot; iOS 15+<br>Add to Home Screen &middot; Offline &amp; online';
+  var navDl=document.querySelector('.nav-dl');
+  if(navDl){navDl.setAttribute('href','web/');navDl.textContent='iPhone App'}
+})();
+</script>
+</body>
+</html>
