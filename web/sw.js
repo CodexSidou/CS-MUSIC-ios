@@ -1,4 +1,4 @@
-﻿const CACHE = 'cs-music-v3';
+﻿const CACHE = 'cs-music-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -35,26 +35,14 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req).then(r => {
-        const copy = r.clone();
-        caches.open(CACHE).then(c => c.put('./index.html', copy));
-        return r;
-      }).catch(() => caches.match('./index.html').then(r => r || caches.match('./')))
-    );
-    return;
-  }
   e.respondWith(
-    caches.match(req).then(cached => {
-      if (cached) return cached;
-      return fetch(req).then(r => {
-        if (r.ok && (r.type === 'basic' || r.type === 'default')) {
-          const copy = r.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
-        }
-        return r;
-      });
-    })
+    fetch(req).then(r => {
+      if (r.ok && (r.type === 'basic' || r.type === 'default')) {
+        const copy = r.clone();
+        const key = req.mode === 'navigate' ? './index.html' : req;
+        caches.open(CACHE).then(c => c.put(key, copy));
+      }
+      return r;
+    }).catch(() => caches.match(req).then(c => c || caches.match('./index.html')))
   );
 });
