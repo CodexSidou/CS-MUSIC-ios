@@ -1,4 +1,4 @@
-const CACHE = 'cs-music-v1';
+﻿const CACHE = 'cs-music-v2';
 const ASSETS = [
   './',
   './index.html',
