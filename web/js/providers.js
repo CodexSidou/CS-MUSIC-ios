@@ -183,6 +183,7 @@ async function rotate(stickyGet, stickySet, bases, path, timeoutMs = 7000) {
         stickySet(order[i]);
         return d;
       } catch (e) { lastErr = e; }
+      if (t < tries - 1) await new Promise(r => setTimeout(r, 250));
     }
   }
   throw lastErr || new Error('all instances failed');
@@ -222,6 +223,9 @@ export const youtube = {
     if (!pick) throw new Error('no playable stream');
     track._resolved = pick.url;
     track._resolvedAt = Date.now();
+    track._candidates = candidates.map(c => c.url);
+    track._candidateMimes = candidates.map(c => c.mime);
+    track._candidateIx = candidates.findIndex(c => c.url === pick.url);
     return pick.url;
   }
 };

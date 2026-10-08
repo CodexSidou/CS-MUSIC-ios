@@ -194,6 +194,19 @@ export const player = {
     m.addEventListener('error', () => {
       if (!m.src) return;
       this.emit('mediaerror');
+      const track = this.current();
+      if (track && Array.isArray(track._candidates) && track._candidateIx < track._candidates.length - 1 && this._consecErrors < 4) {
+        track._candidateIx++;
+        this._consecErrors++;
+        this.loading = true;
+        this.emit('state');
+        setTimeout(() => {
+          m.src = track._candidates[track._candidateIx];
+          m.load();
+          m.play().then(() => { this.playing = true; }).catch(() => { /* next error will handle */ });
+        }, 300);
+        return;
+      }
       if (this.queue.length > 1 && this._consecErrors < 3) {
         this._consecErrors++;
         setTimeout(() => this._advance(true), 700);

@@ -413,7 +413,15 @@ export async function saveOnline(track, onProgress) {
   const attempt = async (fresh) => {
     if (fresh) { track._resolved = null; track._resolvedAt = 0; }
     const url = await resolveStream(track);
-    const blob = await fetchWithProgress(url, onProgress);
+    const urls = Array.isArray(track._candidates) && track._candidates.length ? [url].concat(track._candidates.filter(u => u !== url)) : [url];
+    let blob = null;
+    for (const u of urls) {
+      try {
+        const b = await fetchWithProgress(u, onProgress);
+        if (b && b.size >= 1024) { blob = b; break; }
+      } catch { /* try next candidate */ }
+    }
+    if (!blob) throw new Error('download failed');
     track.file = blob;
     track.saved = true;
     track.provider = track.provider === 'local' ? 'local' : track.provider;
