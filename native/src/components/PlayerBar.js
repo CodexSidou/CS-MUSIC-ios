@@ -34,7 +34,7 @@ export function PlayerBar() {
             {current.title}
           </Text>
           <Text style={styles.sub} numberOfLines={1}>
-            {current.artist || 'KIZ Music'}
+            {current.artist || 'CS Music'}
           </Text>
         </View>
 

@@ -35,10 +35,10 @@ compose.desktop {
         nativeDistributions {
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
                           org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe)
-            packageName = "RSTPlayer"
+            packageName = "CSMusic"
             packageVersion = "2.0.0.0"
-            vendor = "rkkizar777-design"
-            description = "RST Player for PC"
+            vendor = "CS Music"
+            description = "CS Music for PC"
 
             windows {
                 menu = true

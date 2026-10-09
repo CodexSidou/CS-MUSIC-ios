@@ -85,7 +85,7 @@ export function FullPlayerModal() {
             <View style={styles.headerTitleWrap}>
               <Text style={styles.headerSub}>PLAYING FROM</Text>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {current.provider?.toUpperCase() || 'KIZ MUSIC'}
+                {current.provider?.toUpperCase() || 'CS MUSIC'}
               </Text>
             </View>
 

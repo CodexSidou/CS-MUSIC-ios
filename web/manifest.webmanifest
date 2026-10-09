@@ -1,6 +1,6 @@
 {
-  "name": "CS music",
-  "short_name": "CS music",
+  "name": "CS Music",
+  "short_name": "CS Music",
   "description": "Offline and online music player. Your library, playlists, and streaming in one app. Zero tracking.",
   "start_url": "./index.html",
   "scope": "./",

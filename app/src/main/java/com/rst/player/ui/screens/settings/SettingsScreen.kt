@@ -326,12 +326,12 @@ fun SettingsScreen() {
 
 // ── About & Legal ─────────────────────────────────────────────────────────
 
-private const val DEVELOPER_HANDLE = "rkkizar777-design"
-private const val DEVELOPER_URL = "https://github.com/rkkizar777-design"
+private const val DEVELOPER_HANDLE = "CodexSidou"
+private const val DEVELOPER_URL = "https://github.com/CodexSidou/CS-MUSIC-ios"
 
 private const val LEGAL_COPYRIGHT =
-    "Copyright \u00A9 2026 rkkizar777-design. All rights reserved. " +
-        "RST Player and its source code are the intellectual property of the developer, " +
+    "Copyright \u00A9 2026 CodexSidou. All rights reserved. " +
+        "CS Music and its source code are the intellectual property of the developer, " +
         "protected under copyright law. Unauthorized copying, reproduction, distribution " +
         "or modification of this application, in whole or in part, is strictly prohibited."
 
@@ -361,15 +361,15 @@ To the maximum extent permitted by law, the developer shall not be liable for an
 These Terms may be updated from time to time. Continued use of the App after changes take effect constitutes acceptance of the revised Terms.
 
 7. CONTACT
-Questions? Reach the developer on GitHub: github.com/rkkizar777-design"""
+Questions? Reach the developer on GitHub: github.com/CodexSidou/CS-MUSIC-ios"""
 
 private const val PRIVACY_POLICY_TEXT =
     """Last updated: 2026
 
-Your privacy matters. RST Player is designed to be fully private by default.
+Your privacy matters. CS Music is designed to be fully private by default.
 
 1. WHAT WE COLLECT
-Nothing. RST Player does not collect, store or transmit any personal data. There is no account, no registration and no tracking.
+Nothing. CS Music does not collect, store or transmit any personal data. There is no account, no registration and no tracking.
 
 2. ON-DEVICE PROCESSING
 All of your music, listening history and audio analysis stays on your device. Nothing leaves your phone. Smart recommendations and play modes are computed locally.
@@ -378,7 +378,7 @@ All of your music, listening history and audio analysis stays on your device. No
 The App may request access to your music library and, optionally, notification access to show playback controls. Downloaded content is stored only on your device.
 
 4. NETWORK ACTIVITY
-The only network activity is initiated by you — for example, searching YouTube or downloading a song. Those requests go directly to the relevant service; RST Player does not log or retain them beyond what is needed to play your content.
+The only network activity is initiated by you — for example, searching YouTube or downloading a song. Those requests go directly to the relevant service; CS Music does not log or retain them beyond what is needed to play your content.
 
 5. DATA SECURITY
 Because no data leaves your device, there is nothing to intercept. Your listening habits remain yours.
@@ -387,11 +387,11 @@ Because no data leaves your device, there is nothing to intercept. Your listenin
 If this policy changes, the updated version will appear here.
 
 7. CONTACT
-Questions? Reach the developer on GitHub: github.com/rkkizar777-design"""
+Questions? Reach the developer on GitHub: github.com/CodexSidou/CS-MUSIC-ios"""
 
 private const val LICENSE_TEXT =
-    """RST Player
-Copyright \u00A9 2026 rkkizar777-design. All Rights Reserved.
+    """CS Music
+Copyright \u00A9 2026 CodexSidou. All Rights Reserved.
 
 RST Player is proprietary, licensed software. It is not open source and is not free for redistribution.
 

@@ -173,7 +173,7 @@ export function renderHome() {
     html += `<div class="sec-head"><h2>Trending now</h2><span class="link">Audius</span></div>`;
     html += `<div id="trending-slot">${state.trending.length ? `<div class="card-list">${trending.map((t, i) => rowHtml(t, 'trending', i)).join('')}</div>` : '<div class="skeleton"></div><div class="skeleton"></div>'}</div>`;
   }
-  html += `<div class="about-note">CS music Web · Offline &amp; online · Zero tracking<br><a href="https://github.com/rkkizar777-design/kiz-player-apk" target="_blank" rel="noopener">Source on GitHub</a></div>`;
+  html += `<div class="about-note">CS Music Web · Offline &amp; online · Zero tracking<br><a href="https://github.com/CodexSidou/CS-MUSIC-ios" target="_blank" rel="noopener">Source on GitHub</a></div>`;
   el.innerHTML = html;
 }
 
@@ -856,7 +856,7 @@ function showAbout() {
   sheet('About', [
     { hint: '<b>CS music Web</b> v1.0 — the iPhone edition of CS music.' },
     { hint: 'Offline library · playlists · iTunes previews · Audius full tracks · YouTube streaming. Zero servers, zero tracking.' },
-    { hint: '<a href="https://github.com/rkkizar777-design/kiz-player-apk" target="_blank" rel="noopener" style="color:var(--green)">github.com/rkkizar777-design/kiz-player-apk</a>' }
+    { hint: '<a href="https://github.com/CodexSidou/CS-MUSIC-ios" target="_blank" rel="noopener" style="color:var(--green)">github.com/CodexSidou/CS-MUSIC-ios</a>' }
   ]);
 }
 
