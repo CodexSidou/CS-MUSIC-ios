@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePlayer } from '../context/PlayerContext';
-import TrackRow, { DownloadState } from '../components/TrackRow';
+import { TrackRow, DownloadState } from '../components/TrackRow';
 import { theme } from '../theme';
 
 export default function LibraryScreen() {

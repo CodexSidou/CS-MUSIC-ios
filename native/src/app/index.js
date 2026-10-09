@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { usePlayer } from '../context/PlayerContext';
-import TrackRow, { DownloadState } from '../components/TrackRow';
+import { TrackRow, DownloadState } from '../components/TrackRow';
 import { searchYouTube } from '../api/youtube';
 import { searchITunes, searchArchive } from '../api/providers';
 import { theme } from '../theme';
