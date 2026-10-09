@@ -1,0 +1,24 @@
+# RST hot paths: precompile app code at install (Lark-style smoothness).
+# Library code (Compose, Media3, Room, Coil) brings its own baseline profiles.
+Lcom/rst/player/RstApplication;
+Lcom/rst/player/MainActivity;
+Lcom/rst/player/AppGraph;
+Lcom/rst/player/player/PlayerController;
+Lcom/rst/player/player/PlaybackService;
+Lcom/rst/player/player/MediaItemFactoryKt;
+Lcom/rst/player/player/NowPlayingItem;
+Lcom/rst/player/data/repository/MusicRepository;
+Lcom/rst/player/data/mediastore/MediaStoreScanner;
+Lcom/rst/player/data/preferences/UserPreferences;
+Lcom/rst/player/youtube/YouTubeRepository;
+Lcom/rst/player/youtube/DownloadTracker;
+Lcom/rst/player/util/FormattersKt;
+Lcom/rst/player/ui/RstAppKt;
+Lcom/rst/player/ui/RoutesKt;
+Lcom/rst/player/ui/screens/**;
+Lcom/rst/player/ui/components/**;
+Lcom/rst/player/ui/viewmodel/**;
+Lcom/rst/player/ui/core/**;
+Lcom/rst/player/data/model/**;
+Lcom/rst/player/data/db/**;
+Lcom/rst/player/recommender/**;

@@ -1,20 +1,27 @@
 {
   "expo": {
-    "name": "CS music",
-    "slug": "cs-music",
+    "name": "KIZ Player",
+    "slug": "kiz-player",
     "version": "1.0.0",
-    "scheme": "csmusic",
+    "scheme": "kizplayer",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#04011B",
+    "backgroundColor": "#08051A",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "dev.cs.music"
+      "bundleIdentifier": "com.kiz.player",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "android": {
+      "package": "com.kiz.player",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#08051A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

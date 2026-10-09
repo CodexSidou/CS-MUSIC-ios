@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The yt-dlp engine is referenced by the youtubedl-android library through
+    an inlined R constant that the resource shrinker cannot trace, so it was
+    being stripped from release builds. Keep it: without it the app has no
+    download engine at all.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/ytdlp" />

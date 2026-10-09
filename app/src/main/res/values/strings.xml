@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">RST Player</string>
+    <string name="stats_widget_desc">Your listening stats at a glance</string>
+</resources>

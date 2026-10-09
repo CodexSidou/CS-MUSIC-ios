@@ -1,128 +1,163 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { usePlayer } from '../context/PlayerContext';
 import { theme } from '../theme';
 
-function fmt(sec) {
-  if (!Number.isFinite(sec) || sec < 0) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s < 10 ? '0' : ''}${s}`;
-}
-
 export function PlayerBar() {
-  const { current, status, toggle, next, prev, seekTo } = usePlayer();
+  const { current, status, toggle, next, openFullPlayer } = usePlayer();
+
   if (!current) return null;
+
   const dur = status.duration || current.duration || 1;
   const pos = Math.min(status.currentTime || 0, dur);
   const pct = Math.max(0, Math.min(1, pos / dur));
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.meta}>
-        <View style={styles.thumb}>
-          <Text style={styles.thumbText} numberOfLines={1}>
-            {'\u266B'}
-          </Text>
+    <View style={styles.container}>
+      <Pressable onPress={openFullPlayer} style={styles.inner}>
+        {/* Track Thumbnail */}
+        <View style={styles.thumbWrap}>
+          {current.cover ? (
+            <Image source={{ uri: current.cover }} style={styles.thumb} />
+          ) : (
+            <View style={[styles.thumb, styles.thumbFallback]}>
+              <Ionicons name="musical-note" size={18} color={theme.cyan} />
+            </View>
+          )}
         </View>
-        <View style={styles.metaText}>
+
+        {/* Track Metadata */}
+        <View style={styles.meta}>
           <Text style={styles.title} numberOfLines={1}>
             {current.title}
           </Text>
           <Text style={styles.sub} numberOfLines={1}>
-            {current.artist || 'CS music'}
+            {current.artist || 'KIZ Music'}
           </Text>
         </View>
-        <Pressable
-          onPress={() => {
-            const target = pct >= 0.98 ? 0 : pos + 15;
-            seekTo(target >= dur ? dur - 2 : target);
-          }}
-          style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
-        >
-          <Text style={styles.btnText}>{fmt(pos)}</Text>
-        </Pressable>
-      </View>
+
+        {/* Controls */}
+        <View style={styles.controls}>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              toggle();
+            }}
+            hitSlop={8}
+            style={({ pressed }) => [styles.playBtn, pressed && styles.btnPressed]}
+          >
+            <Ionicons
+              name={status.playing ? 'pause' : 'play'}
+              size={20}
+              color="#FFFFFF"
+              style={status.playing ? null : { marginLeft: 2 }}
+            />
+          </Pressable>
+
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              next();
+            }}
+            hitSlop={8}
+            style={({ pressed }) => [styles.nextBtn, pressed && styles.btnPressed]}
+          >
+            <Ionicons name="play-forward" size={20} color={theme.textDim} />
+          </Pressable>
+        </View>
+      </Pressable>
+
+      {/* Thin Bottom Progress Line */}
       <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${pct * 100}%` }]} />
-      </View>
-      <View style={styles.controls}>
-        <Pressable onPress={prev} style={({ pressed }) => [styles.fab, pressed && styles.btnPressed]}>
-          <Text style={styles.fabText}>{'\u23EE'}</Text>
-        </Pressable>
-        <Pressable onPress={toggle} style={({ pressed }) => [styles.play, pressed && styles.btnPressed]}>
-          <Text style={styles.playText}>{status.playing ? '\u23F8' : '\u25B6'}</Text>
-        </Pressable>
-        <Pressable onPress={next} style={({ pressed }) => [styles.fab, pressed && styles.btnPressed]}>
-          <Text style={styles.fabText}>{'\u23ED'}</Text>
-        </Pressable>
+        <LinearGradient
+          colors={[theme.cyan, theme.indigo]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.progressFill, { width: `${pct * 100}%` }]}
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
+  container: {
     backgroundColor: theme.surface,
-    paddingTop: 10,
-    paddingHorizontal: 14,
-    paddingBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  meta: { flexDirection: 'row', alignItems: 'center' },
-  thumb: {
-    width: 40,
-    height: 40,
+  inner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  thumbWrap: {
+    width: 44,
+    height: 44,
     borderRadius: 8,
+    overflow: 'hidden',
     backgroundColor: theme.surface2,
+  },
+  thumb: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbFallback: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  thumbText: { color: theme.cyan, fontSize: 18 },
-  metaText: { flex: 1, marginRight: 8 },
-  title: { color: theme.text, fontWeight: '700', fontSize: 14 },
-  sub: { color: theme.textDim, fontSize: 12, marginTop: 2 },
-  btn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: theme.surface2,
+  meta: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
   },
-  btnPressed: { opacity: 0.7 },
-  btnText: { color: theme.cyan, fontSize: 12, fontVariant: ['tabular-nums'] },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.surface2,
-    marginTop: 10,
-    overflow: 'hidden',
+  title: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
-  progressFill: { height: 4, backgroundColor: theme.indigo },
+  sub: {
+    color: theme.textDim,
+    fontSize: 12,
+    marginTop: 2,
+  },
   controls: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 10,
+    gap: 8,
   },
-  play: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  playBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: theme.indigo,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 24,
   },
-  playText: { color: '#fff', fontSize: 20, marginLeft: 2 },
-  fab: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.surface2,
+  nextBtn: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fabText: { color: theme.text, fontSize: 16 },
+  btnPressed: {
+    opacity: 0.6,
+  },
+  progressTrack: {
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+  },
 });

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme';
 
 function fmt(sec) {
@@ -9,90 +10,233 @@ function fmt(sec) {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-export function TrackRow({ track, onPlay, extra }) {
+function SourceBadge({ provider }) {
+  let iconName = 'musical-notes';
+  let color = theme.cyan;
+  let bg = 'rgba(0, 240, 255, 0.12)';
+
+  if (provider === 'spotify') {
+    iconName = 'logo-spotify';
+    color = theme.spotify;
+    bg = 'rgba(29, 185, 84, 0.15)';
+  } else if (provider === 'youtube') {
+    iconName = 'logo-youtube';
+    color = theme.youtube;
+    bg = 'rgba(255, 0, 51, 0.15)';
+  } else if (provider === 'soundcloud') {
+    iconName = 'logo-soundcloud';
+    color = theme.soundcloud;
+    bg = 'rgba(255, 85, 0, 0.15)';
+  } else if (provider === 'itunes' || provider === 'charts') {
+    iconName = 'logo-apple';
+    color = theme.itunes;
+    bg = 'rgba(252, 60, 68, 0.15)';
+  } else if (provider === 'archive') {
+    iconName = 'archive';
+    color = theme.purple;
+    bg = 'rgba(155, 81, 224, 0.15)';
+  }
+
+  return (
+    <View style={[styles.badge, { backgroundColor: bg }]}>
+      <Ionicons name={iconName} size={11} color={color} />
+      <Text style={[styles.badgeText, { color }]}>{provider || 'audio'}</Text>
+    </View>
+  );
+}
+
+export function TrackRow({ track, onPlay, isPlaying, extra }) {
   const dur = fmt(track.duration);
+
   return (
     <Pressable
       onPress={onPlay}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [
+        styles.row,
+        isPlaying && styles.rowActive,
+        pressed && styles.rowPressed,
+      ]}
     >
-      {track.cover ? (
-        <Image source={{ uri: track.cover }} style={styles.cover} />
-      ) : (
-        <View style={[styles.cover, styles.coverFallback]}>
-          <Text style={styles.coverGlyph}>{'\u266B'}</Text>
-        </View>
-      )}
+      <View style={styles.coverWrapper}>
+        {track.cover ? (
+          <Image source={{ uri: track.cover }} style={styles.cover} />
+        ) : (
+          <View style={[styles.cover, styles.coverFallback]}>
+            <Ionicons name="musical-notes" size={20} color={theme.cyan} />
+          </View>
+        )}
+        {isPlaying ? (
+          <View style={styles.playingOverlay}>
+            <Ionicons name="volume-high" size={16} color="#FFFFFF" />
+          </View>
+        ) : null}
+      </View>
+
       <View style={styles.mid}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, isPlaying && styles.titleActive]} numberOfLines={1}>
           {track.title}
         </Text>
-        <Text style={styles.sub} numberOfLines={1}>
-          {track.artist || track.provider}
-          {track.album ? `  \u00B7  ${track.album}` : ''}
-          {dur ? `  \u00B7  ${dur}` : ''}
-        </Text>
+        <View style={styles.subRow}>
+          <SourceBadge provider={track.provider} />
+          <Text style={styles.sub} numberOfLines={1}>
+            {track.artist || 'Unknown Artist'}
+            {dur ? `  \u00B7  ${dur}` : ''}
+          </Text>
+        </View>
       </View>
+
       {extra}
     </Pressable>
   );
 }
 
-export function DownloadState({ track, downloads }) {
+export function DownloadButton({ track, downloads, onDownload }) {
   const d = downloads[track.id];
-  if (track.fileUri) {
+  const isDownloaded = Boolean(track.fileUri);
+
+  if (isDownloaded) {
     return (
-      <Text style={styles.badgeDone}>{'\u2713'}</Text>
-    );
-  }
-  if (!d) return null;
-  if (d.status === 'resolving') {
-    return (
-      <View style={styles.spinWrap}>
-        <Text style={styles.spinText}>{'\u21BB'}</Text>
+      <View style={styles.doneBtn}>
+        <Ionicons name="checkmark-circle" size={22} color={theme.success} />
       </View>
     );
   }
-  if (d.status === 'downloading') {
+
+  if (d && (d.status === 'resolving' || d.status === 'downloading')) {
     const pct = Math.round((d.progress || 0) * 100);
     return (
-      <View style={styles.dlWrap}>
-        <Text style={styles.dlText}>{pct}%</Text>
-        <View style={styles.dlTrack}>
-          <View style={[styles.dlFill, { width: `${Math.max(4, pct)}%` }]} />
-        </View>
+      <View style={styles.loadingBtn}>
+        <ActivityIndicator size="small" color={theme.cyan} />
+        {pct > 0 && pct < 100 ? (
+          <Text style={styles.pctText}>{pct}%</Text>
+        ) : null}
       </View>
     );
   }
-  if (d.status === 'done') {
-    return <Text style={styles.badgeDone}>{'\u2713'}</Text>;
+
+  if (d && d.status === 'done') {
+    return (
+      <View style={styles.doneBtn}>
+        <Ionicons name="checkmark-circle" size={22} color={theme.success} />
+      </View>
+    );
   }
-  return <Text style={styles.badgeErr}>{'!'}</Text>;
+
+  return (
+    <Pressable
+      onPress={onDownload}
+      hitSlop={8}
+      style={({ pressed }) => [styles.dlBtn, pressed && styles.btnPressed]}
+    >
+      <Ionicons name="arrow-down-circle-outline" size={24} color={theme.cyan} />
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     backgroundColor: theme.surface,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
   },
-  rowPressed: { opacity: 0.75 },
-  cover: { width: 48, height: 48, borderRadius: 8, backgroundColor: theme.surface2 },
-  coverFallback: { alignItems: 'center', justifyContent: 'center' },
-  coverGlyph: { color: theme.cyan, fontSize: 20 },
-  mid: { flex: 1, marginLeft: 12, marginRight: 8 },
-  title: { color: theme.text, fontWeight: '600', fontSize: 15 },
-  sub: { color: theme.textDim, fontSize: 12, marginTop: 3 },
-  badgeDone: { color: theme.success, fontSize: 18, fontWeight: '700' },
-  badgeErr: { color: theme.danger, fontSize: 16, fontWeight: '700' },
-  spinWrap: { alignItems: 'center', justifyContent: 'center', minWidth: 28 },
-  spinText: { color: theme.indigo, fontSize: 18 },
-  dlWrap: { alignItems: 'flex-end', minWidth: 46 },
-  dlText: { color: theme.cyan, fontSize: 12, marginBottom: 3, fontVariant: ['tabular-nums'] },
-  dlTrack: { width: 44, height: 4, borderRadius: 2, backgroundColor: theme.surface2, overflow: 'hidden', marginBottom: 3 },
-  dlFill: { height: 4, backgroundColor: theme.cyan },
+  rowActive: {
+    borderColor: theme.indigo,
+    backgroundColor: theme.surfaceLight,
+  },
+  rowPressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.99 }],
+  },
+  coverWrapper: {
+    position: 'relative',
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  cover: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: theme.surface2,
+  },
+  coverFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.surface2,
+  },
+  playingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(124, 89, 251, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mid: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  title: {
+    color: theme.text,
+    fontWeight: '600',
+    fontSize: 15,
+    letterSpacing: -0.2,
+  },
+  titleActive: {
+    color: theme.cyan,
+  },
+  subRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sub: {
+    color: theme.textDim,
+    fontSize: 12,
+    flex: 1,
+    marginLeft: 6,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 3,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  dlBtn: {
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingBtn: {
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 32,
+  },
+  pctText: {
+    color: theme.cyan,
+    fontSize: 9,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  doneBtn: {
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnPressed: {
+    opacity: 0.6,
+  },
 });

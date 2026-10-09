@@ -1,14 +1,15 @@
 import { db, uid } from './db.js';
-import { itunes, audius, youtube, archive, resolveStream, fetchWithProgress } from './providers.js';
+import { itunes, audius, youtube, archive, soundcloud, spotify, resolveStream, fetchWithProgress } from './providers.js';
 import { player } from './player.js';
 
 export const state = {
   screen: 'home',
   library: [],
   results: [],
+  collection: null,
   charts: [],
   trending: [],
-  source: 'itunes',
+  source: 'all',
   libFilter: 'all',
   libSort: 'added',
   registry: new Map(),
@@ -41,7 +42,7 @@ const ICONS = {
   import: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 
-const SOURCE_BADGE = { itunes: 'iTunes', audius: 'Audius', youtube: 'YT', archive: 'Arc', local: '' };
+const SOURCE_BADGE = { itunes: 'iTunes', audius: 'Audius', youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', archive: 'Archive', local: '' };
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -195,19 +196,22 @@ export async function loadHomeFeeds() {
 }
 
 const SOURCE_TABS = [
+  { key: 'all', label: 'All Sources' },
+  { key: 'spotify', label: 'Spotify' },
+  { key: 'soundcloud', label: 'SoundCloud' },
+  { key: 'youtube', label: 'YouTube' },
   { key: 'itunes', label: 'iTunes' },
   { key: 'audius', label: 'Audius' },
-  { key: 'archive', label: 'Archive' },
-  { key: 'youtube', label: 'YouTube' }
+  { key: 'archive', label: 'Archive' }
 ];
 
 export function renderSearch() {
   const el = $('#search-content');
   el.innerHTML = `
     <div class="screen-title">Search</div>
-    <div class="screen-sub">Find songs online, then save them for offline listening.</div>
+    <div class="screen-sub">Search online or paste a Spotify link (track, album, playlist) to save offline.</div>
     <form class="search-bar" id="search-form">
-      <div class="search-field">${ICONS.search}<input type="search" id="search-input" placeholder="Songs, artists, albums…" autocomplete="off" enterkeyhint="search"></div>
+      <div class="search-field">${ICONS.search}<input type="search" id="search-input" placeholder="Search song or paste Spotify URL…" autocomplete="off" enterkeyhint="search"></div>
     </form>
     <div class="src-tabs">${SOURCE_TABS.map(s => `<button class="src-tab${state.source === s.key ? ' active' : ''}" data-src="${s.key}">${s.label}</button>`).join('')}</div>
     <div id="search-results"></div>`;
@@ -227,15 +231,58 @@ export function renderSearchResults() {
   }
   if (!state.searched) {
     el.innerHTML = `<div class="empty"><div class="big">🔍</div><h3>Search online music</h3>
-      <p>${state.source === 'youtube' ? 'YouTube streams are tried best-effort — if YouTube blocks them, use Audius or Archive for full songs.' : state.source === 'audius' ? 'Full-length free tracks from Audius artists.' : state.source === 'archive' ? 'Full-length public recordings from the Internet Archive.' : 'Millions of songs with 30-second previews from iTunes.'}</p></div>`;
+      <p>Search any song, artist, album, or paste a Spotify link (track, album, playlist) to play and download offline on iPhone.</p></div>`;
     return;
   }
   if (!state.results.length) {
-    el.innerHTML = `<div class="empty"><div class="big">🤷</div><h3>No results</h3><p>Try different words or switch the source above.</p></div>`;
+    el.innerHTML = `<div class="empty"><div class="big">🤷</div><h3>No results</h3><p>Try different keywords or switch the source above.</p></div>`;
     return;
   }
   registerTracks(state.results, 'results');
-  el.innerHTML = `<div class="card-list">${state.results.map((t, i) => rowHtml(t, 'results', i)).join('')}</div>`;
+
+  let bannerHtml = '';
+  if (state.collection) {
+    bannerHtml = `
+      <div class="col-banner">
+        <div class="col-art">${state.collection.artwork ? `<img src="${esc(state.collection.artwork)}" alt="">` : ICONS.music}</div>
+        <div class="col-meta">
+          <span class="col-badge">SPOTIFY ${esc(state.collection.type.toUpperCase())}</span>
+          <div class="col-title">${esc(state.collection.title)}</div>
+          <div class="col-sub">${esc(state.collection.artist)} · ${state.collection.tracks.length} tracks</div>
+          <div class="col-actions">
+            <button class="pill-btn primary" id="btn-col-play">${ICONS.play} Play all</button>
+            <button class="pill-btn" id="btn-col-dl">${ICONS.dl} Save all</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  el.innerHTML = bannerHtml + `<div class="card-list">${state.results.map((t, i) => rowHtml(t, 'results', i)).join('')}</div>`;
+
+  if (state.collection) {
+    const playBtn = $('#btn-col-play');
+    if (playBtn) {
+      playBtn.onclick = () => player.playTracks(state.collection.tracks, 0);
+    }
+    const dlBtn = $('#btn-col-dl');
+    if (dlBtn) {
+      dlBtn.onclick = async () => {
+        dlBtn.disabled = true;
+        dlBtn.textContent = 'Saving…';
+        let savedCount = 0;
+        for (let idx = 0; idx < state.collection.tracks.length; idx++) {
+          const trk = state.collection.tracks[idx];
+          toast(`Saving ${idx + 1}/${state.collection.tracks.length}: ${trk.title}`);
+          const ok = await saveOnline(trk);
+          if (ok) savedCount++;
+        }
+        dlBtn.disabled = false;
+        dlBtn.innerHTML = `${ICONS.check} Saved (${savedCount})`;
+        toast(`Saved ${savedCount} songs to offline library!`);
+      };
+    }
+  }
 }
 
 export async function doSearch(q) {
@@ -243,13 +290,57 @@ export async function doSearch(q) {
   if (!state.online) { toast('You are offline', true); return; }
   state.searched = true;
   state.searchBusy = true;
+  state.collection = null;
   renderSearchResults();
+
   try {
+    // 1. Detect Spotify URL (tracks, albums, playlists)
+    if (spotify.isUrl(q)) {
+      const spData = await spotify.resolve(q);
+      if (spData.type === 'album' || spData.type === 'playlist') {
+        state.collection = spData;
+        state.results = spData.tracks || [];
+      } else {
+        state.collection = null;
+        state.results = spData.tracks || [];
+      }
+      state.searchBusy = false;
+      renderSearchResults();
+      toast(`Loaded Spotify ${spData.type}`);
+      return;
+    }
+
     let res = [];
-    if (state.source === 'itunes') res = await itunes.search(q);
-    else if (state.source === 'audius') res = await audius.search(q);
-    else if (state.source === 'archive') res = await archive.search(q);
-    else res = await youtube.search(q);
+    if (state.source === 'all') {
+      const [sc, sp, yt] = await Promise.allSettled([
+        soundcloud.search(q),
+        spotify.search(q),
+        youtube.search(q)
+      ]);
+      const scList = sc.status === 'fulfilled' ? sc.value : [];
+      const spList = sp.status === 'fulfilled' ? sp.value : [];
+      const ytList = yt.status === 'fulfilled' ? yt.value : [];
+      const maxLen = Math.max(scList.length, spList.length, ytList.length);
+      const combined = [];
+      for (let i = 0; i < maxLen; i++) {
+        if (scList[i]) combined.push(scList[i]);
+        if (spList[i]) combined.push(spList[i]);
+        if (ytList[i]) combined.push(ytList[i]);
+      }
+      res = combined.slice(0, 35);
+    } else if (state.source === 'spotify') {
+      res = await spotify.search(q);
+    } else if (state.source === 'soundcloud') {
+      res = await soundcloud.search(q);
+    } else if (state.source === 'youtube') {
+      res = await youtube.search(q);
+    } else if (state.source === 'itunes') {
+      res = await itunes.search(q);
+    } else if (state.source === 'audius') {
+      res = await audius.search(q);
+    } else if (state.source === 'archive') {
+      res = await archive.search(q);
+    }
     state.results = res;
     state.searchBusy = false;
     renderSearchResults();
@@ -258,7 +349,7 @@ export async function doSearch(q) {
     state.searchBusy = false;
     state.results = [];
     renderSearchResults();
-    toast(state.source === 'youtube' ? 'YouTube sources unreachable right now' : 'Search failed — check your connection', true);
+    toast('Search failed — check your connection or switch source', true);
   }
 }
 
