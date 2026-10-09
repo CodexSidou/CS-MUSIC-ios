@@ -43,6 +43,82 @@ function fmtDur(sec) {
   return Math.round(sec);
 }
 
+export function cleanQuery(artist, title) {
+  const cleanTitle = (title || '')
+    .replace(/\s*[\(\[](feat\.|ft\.|remastered|official|video|audio|deluxe|version|edit|remix).*?[\)\]]/gi, '')
+    .replace(/-\s*single/gi, '')
+    .replace(/-\s*radio edit/gi, '')
+    .trim();
+  const cleanArtist = (artist || '').replace(/\s*(feat\.|ft\.).*/gi, '').trim();
+  return {
+    q1: cleanArtist + ' ' + cleanTitle,
+    q2: cleanTitle,
+    q3: (artist || '') + ' ' + (title || '')
+  };
+}
+
+// Full-length Music Provider (Saavn API with 320kbps & 160kbps audio streams)
+export const saavn = {
+  INSTANCES: [
+    'https://jiosaavn-api-2.vercel.app',
+    'https://saavn-api.vercel.app',
+  ],
+
+  async search(q) {
+    if (!q || !q.trim()) return [];
+    for (const base of this.INSTANCES) {
+      try {
+        const url = `${base}/search/songs?query=${encodeURIComponent(q.trim())}`;
+        const d = await jget(url, 6000);
+        const list = d?.results || (Array.isArray(d?.data) ? d.data : d?.data?.results) || [];
+        if (!list.length) continue;
+
+        return list.map(s => {
+          const dlUrls = s.downloadUrl || [];
+          const best = dlUrls.find(u => u.quality === '320kbps')
+            || dlUrls.find(u => u.quality === '160kbps')
+            || dlUrls.find(u => u.quality === '96kbps')
+            || dlUrls[dlUrls.length - 1];
+
+          const img = s.image || s.album?.image;
+          const art = Array.isArray(img)
+            ? (img.find(i => i.quality === '500x500') || img[img.length - 1])?.link
+            : (typeof img === 'string' ? img : null);
+
+          return {
+            id: 'saavn:' + s.id,
+            provider: 'saavn',
+            title: s.name || s.title || 'Unknown',
+            artist: s.primaryArtists || s.artists || s.singers || 'Artist',
+            album: s.album?.name || s.album || '',
+            artwork: art,
+            duration: fmtDur(Number(s.duration) || 0),
+            streamUrl: best?.link || null,
+            downloadUrls: dlUrls,
+            saved: false,
+          };
+        }).filter(t => t.streamUrl);
+      } catch (_) { }
+    }
+    return [];
+  },
+
+  async resolve(track) {
+    if (track.streamUrl && !isPreviewUrl(track.streamUrl)) return track.streamUrl;
+    const { q1, q2, q3 } = cleanQuery(track.artist, track.title);
+    for (const q of [q1, q3, q2]) {
+      if (!q || !q.trim()) continue;
+      const list = await this.search(q);
+      const found = list.find(r => r.streamUrl && !isPreviewUrl(r.streamUrl) && (track.duration > 0 ? Math.abs(r.duration - track.duration) < 40 : r.duration > 45))
+        || list[0];
+      if (found && found.streamUrl && !isPreviewUrl(found.streamUrl)) {
+        return found.streamUrl;
+      }
+    }
+    throw new Error('No Saavn full stream found');
+  }
+};
+
 // SoundCloud Provider
 export const soundcloud = {
   async getClientId() {
@@ -315,26 +391,18 @@ export const audius = {
     }
     return [];
   },
-  async trending() {
-    for (const host of AUDIUS_HOSTS) {
-      try {
-        const d = await jget(`${host}/v1/tracks/trending?app_name=CSMusic&limit=25`);
-        if (!d.data || !d.data.length) continue;
-        return d.data.map(x => ({
-          id: 'audius:' + x.id,
-          provider: 'audius',
-          title: x.title || 'Unknown',
-          artist: (x.user && x.user.name) || '',
-          album: '',
-          artwork: x.artwork && (x.artwork['480x480'] || x.artwork['150x150']),
-          duration: fmtDur(x.duration),
-          streamUrl: `${host}/v1/tracks/${x.id}/stream?app_name=CSMusic`,
-          audiusId: x.id,
-          saved: false
-        }));
-      } catch (_) { }
+  async resolve(track) {
+    if (track.streamUrl && !isPreviewUrl(track.streamUrl)) return track.streamUrl;
+    const { q1, q2, q3 } = cleanQuery(track.artist, track.title);
+    for (const q of [q1, q3, q2]) {
+      if (!q || !q.trim()) continue;
+      const list = await this.search(q);
+      const match = list.find(x => x.streamUrl && !isPreviewUrl(x.streamUrl) && (x.duration > 40 || !x.duration)) || list[0];
+      if (match && match.streamUrl && !isPreviewUrl(match.streamUrl)) {
+        return match.streamUrl;
+      }
     }
-    return [];
+    throw new Error('No Audius full stream found');
   }
 };
 
@@ -396,7 +464,8 @@ export const youtube = {
         const streams = (d.audioStreams || []).concat(d.videoStreams || []);
         if (streams.length > 0) {
           const best = streams.find(s => (s.mimeType || '').includes('audio')) || streams[0];
-          return best.proxyUrl || best.url;
+          const url = best.proxyUrl || best.url;
+          if (url && !isPreviewUrl(url)) return url;
         }
       } catch (_) { }
     }
@@ -405,7 +474,7 @@ export const youtube = {
       try {
         const d = await jget(`${base}/api/v1/videos/${ytId}`, 6000);
         const streams = (d.adaptiveFormats || []).filter(s => (s.type || '').includes('audio'));
-        if (streams.length > 0) {
+        if (streams.length > 0 && streams[0].url && !isPreviewUrl(streams[0].url)) {
           return streams[0].url;
         }
       } catch (_) { }
@@ -438,7 +507,20 @@ export const archive = {
     }
   },
   async resolve(track) {
-    const id = track.archId || (track.id || '').replace('arch:', '');
+    if (track.streamUrl && !isPreviewUrl(track.streamUrl)) return track.streamUrl;
+    let id = track.archId || (track.id && track.id.startsWith('arch:') ? track.id.replace('arch:', '') : null);
+    if (!id) {
+      const { q1, q2 } = cleanQuery(track.artist, track.title);
+      for (const q of [q1, q2]) {
+        if (!q) continue;
+        const results = await this.search(q);
+        if (results.length > 0 && results[0].archId) {
+          id = results[0].archId;
+          break;
+        }
+      }
+    }
+    if (!id) throw new Error('No Archive.org item found');
     const d = await jget(`https://archive.org/metadata/${encodeURIComponent(id)}`);
     const files = (d.files || []).filter(f => /\.mp3$/i.test(f.name));
     const pick = files.find(f => (f.format || '').includes('VBR')) || files[0];
@@ -461,61 +543,65 @@ function isPreviewUrl(url) {
 
 /**
  * Universal Stream Resolver — Full-Track Priority
- * 
- * Strategy: always try full-length sources first (SoundCloud, YouTube,
- * Archive, Audius). Only fall back to 30s previews if everything else fails.
+ * Always resolves full-length tracks (2-5 minutes) for any song, album, or playlist.
+ * Never plays or downloads 20s/30s preview clips.
  */
 export async function resolveStream(track) {
-  // Local file — always full
+  // 1. Local saved file (IndexedDB blob) — always 100% full
   if (track.file) return URL.createObjectURL(track.file);
 
-  // If the track already has a resolved full-length stream URL, use it
+  // 2. Verified full-length stream already on track
   if (track.streamUrl && !isPreviewUrl(track.streamUrl)) {
     return track.streamUrl;
   }
 
-  const searchQ = `${track.artist} - ${track.title}`.replace(/unknown/i, '').trim();
-
-  // 1. Audius — tracks have full direct stream URLs
-  if (track.provider === 'audius' && track.streamUrl) {
-    return track.streamUrl;
-  }
-
-  // 2. SoundCloud — full progressive MP3 streams
+  // 3. Try Saavn first (High-quality 320k/160k DRM-free full audio stream)
   try {
-    const scStream = await soundcloud.resolve(track);
-    if (scStream) return scStream;
-  } catch (_) { }
-
-  // 3. YouTube / Piped / Invidious — full audio streams
-  try {
-    const ytStream = await youtube.resolve(track);
-    if (ytStream) return ytStream;
-  } catch (_) { }
-
-  // 4. Archive.org — full MP3 files
-  if (track.provider === 'archive' || track.archId) {
-    try {
-      return await archive.resolve(track);
-    } catch (_) { }
-  }
-
-  // 5. Last resort: search other full-track providers
-  try {
-    const audiusResults = await audius.search(searchQ || track.title);
-    if (audiusResults.length > 0 && audiusResults[0].streamUrl) {
-      return audiusResults[0].streamUrl;
+    const sStream = await saavn.resolve(track);
+    if (sStream && !isPreviewUrl(sStream)) {
+      track.streamUrl = sStream;
+      return sStream;
     }
   } catch (_) { }
 
-  // 6. Absolute last resort — use the preview clip so something plays
-  const preview = track.previewUrl || track.streamUrl;
-  if (preview) {
-    console.warn(`[resolveStream] Using preview URL for "${track.title}" — full stream unavailable`);
-    return preview;
-  }
+  // 4. Try Audius (100% DRM-free full-length MP3 stream)
+  try {
+    const aStream = await audius.resolve(track);
+    if (aStream && !isPreviewUrl(aStream)) {
+      track.streamUrl = aStream;
+      return aStream;
+    }
+  } catch (_) { }
 
-  throw new Error(`Unable to resolve stream for "${track.title}"`);
+  // 5. Try SoundCloud (Full-length progressive MP3 stream)
+  try {
+    const scStream = await soundcloud.resolve(track);
+    if (scStream && !isPreviewUrl(scStream)) {
+      track.streamUrl = scStream;
+      return scStream;
+    }
+  } catch (_) { }
+
+  // 6. Try Archive.org (Full-length audio files)
+  try {
+    const archStream = await archive.resolve(track);
+    if (archStream && !isPreviewUrl(archStream)) {
+      track.streamUrl = archStream;
+      return archStream;
+    }
+  } catch (_) { }
+
+  // 7. Try YouTube (Piped / Invidious stream)
+  try {
+    const ytStream = await youtube.resolve(track);
+    if (ytStream && !isPreviewUrl(ytStream)) {
+      track.streamUrl = ytStream;
+      return ytStream;
+    }
+  } catch (_) { }
+
+  // 8. CRITICAL: Never return 20s/30s preview as a full song stream
+  throw new Error(`Could not find a full-length stream for "${track.title}".`);
 }
 
 export async function fetchWithProgress(url, onProgress) {

@@ -1,5 +1,5 @@
 import { db, uid } from './db.js';
-import { itunes, audius, youtube, archive, soundcloud, spotify, resolveStream, fetchWithProgress } from './providers.js';
+import { itunes, audius, youtube, archive, soundcloud, spotify, saavn, resolveStream, fetchWithProgress } from './providers.js';
 import { player } from './player.js';
 
 export const state = {
@@ -42,7 +42,7 @@ const ICONS = {
   import: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 
-const SOURCE_BADGE = { itunes: 'iTunes', audius: 'Audius', youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', archive: 'Archive', local: '' };
+const SOURCE_BADGE = { itunes: 'iTunes', audius: 'Audius', youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', archive: 'Archive', saavn: 'Full HQ', local: '' };
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -198,10 +198,9 @@ export async function loadHomeFeeds() {
 const SOURCE_TABS = [
   { key: 'all', label: 'All Sources' },
   { key: 'spotify', label: 'Spotify' },
-  { key: 'soundcloud', label: 'SoundCloud' },
-  { key: 'youtube', label: 'YouTube' },
-  { key: 'itunes', label: 'iTunes' },
   { key: 'audius', label: 'Audius' },
+  { key: 'youtube', label: 'YouTube' },
+  { key: 'soundcloud', label: 'SoundCloud' },
   { key: 'archive', label: 'Archive' }
 ];
 
@@ -312,32 +311,35 @@ export async function doSearch(q) {
 
     let res = [];
     if (state.source === 'all') {
-      const [sc, sp, yt] = await Promise.allSettled([
-        soundcloud.search(q),
+      const [saavnRes, audiusRes, sp, yt] = await Promise.allSettled([
+        saavn.search(q),
+        audius.search(q),
         spotify.search(q),
         youtube.search(q)
       ]);
-      const scList = sc.status === 'fulfilled' ? sc.value : [];
+      const saavnList = saavnRes.status === 'fulfilled' ? saavnRes.value : [];
+      const audiusList = audiusRes.status === 'fulfilled' ? audiusRes.value : [];
       const spList = sp.status === 'fulfilled' ? sp.value : [];
       const ytList = yt.status === 'fulfilled' ? yt.value : [];
-      const maxLen = Math.max(scList.length, spList.length, ytList.length);
+      const maxLen = Math.max(saavnList.length, audiusList.length, spList.length, ytList.length);
       const combined = [];
       for (let i = 0; i < maxLen; i++) {
-        if (scList[i]) combined.push(scList[i]);
+        if (saavnList[i]) combined.push(saavnList[i]);
         if (spList[i]) combined.push(spList[i]);
+        if (audiusList[i]) combined.push(audiusList[i]);
         if (ytList[i]) combined.push(ytList[i]);
       }
-      res = combined.slice(0, 35);
+      res = combined.slice(0, 40);
     } else if (state.source === 'spotify') {
       res = await spotify.search(q);
+    } else if (state.source === 'audius') {
+      res = await audius.search(q);
     } else if (state.source === 'soundcloud') {
       res = await soundcloud.search(q);
     } else if (state.source === 'youtube') {
       res = await youtube.search(q);
     } else if (state.source === 'itunes') {
       res = await itunes.search(q);
-    } else if (state.source === 'audius') {
-      res = await audius.search(q);
     } else if (state.source === 'archive') {
       res = await archive.search(q);
     }

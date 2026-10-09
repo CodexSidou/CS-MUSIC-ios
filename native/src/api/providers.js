@@ -146,10 +146,84 @@ function isPreviewUrl(url) {
       || /preview/i.test(url);
 }
 
+function cleanQuery(artist, title) {
+  const cleanTitle = (title || '')
+    .replace(/\s*[\(\[](feat\.|ft\.|remastered|official|video|audio|deluxe|version|edit|remix).*?[\)\]]/gi, '')
+    .replace(/-\s*single/gi, '')
+    .trim();
+  const cleanArtist = (artist || '').replace(/\s*(feat\.|ft\.).*/gi, '').trim();
+  return {
+    q1: cleanArtist + ' ' + cleanTitle,
+    q2: cleanTitle,
+  };
+}
+
+export async function resolveSaavnStream(track) {
+  const instances = [
+    'https://jiosaavn-api-2.vercel.app',
+    'https://saavn-api.vercel.app',
+  ];
+  const { q1, q2 } = cleanQuery(track.artist, track.title);
+  for (const q of [q1, q2]) {
+    if (!q || !q.trim()) continue;
+    for (const base of instances) {
+      try {
+        const d = await j(`${base}/search/songs?query=${encodeURIComponent(q.trim())}`);
+        const list = d?.results || (Array.isArray(d?.data) ? d.data : d?.data?.results) || [];
+        if (!list.length) continue;
+        const match = list.find(s => s.downloadUrl && s.downloadUrl.length > 0);
+        if (match) {
+          const dl = match.downloadUrl;
+          const best = dl.find(u => u.quality === '320kbps')
+            || dl.find(u => u.quality === '160kbps')
+            || dl.find(u => u.quality === '96kbps')
+            || dl[dl.length - 1];
+          if (best && best.link) {
+            return {
+              url: best.link,
+              mimeType: 'audio/mp4',
+              ext: '.m4a',
+              provider: 'saavn',
+            };
+          }
+        }
+      } catch (_) { }
+    }
+  }
+  return null;
+}
+
+export async function resolveAudiusStream(track) {
+  const AUDIUS_HOSTS = [
+    'https://discoveryprovider.audius.co',
+    'https://discoveryprovider2.audius.co',
+  ];
+  const { q1, q2 } = cleanQuery(track.artist, track.title);
+  for (const q of [q1, q2]) {
+    if (!q) continue;
+    for (const host of AUDIUS_HOSTS) {
+      try {
+        const d = await j(`${host}/v1/tracks/search?query=${encodeURIComponent(q)}&app_name=CSMusic&limit=10`);
+        const list = d?.data || [];
+        const match = list.find(x => x.duration && x.duration >= 45) || list[0];
+        if (match && match.id) {
+          return {
+            url: `${host}/v1/tracks/${match.id}/stream?app_name=CSMusic`,
+            mimeType: 'audio/mpeg',
+            ext: '.mp3',
+            provider: 'audius',
+          };
+        }
+      } catch (_) { }
+    }
+  }
+  return null;
+}
+
 /**
  * Universal Stream Resolver — Full-Track Priority
  * Resolves any track to a playable/downloadable audio URL.
- * Always tries full-length sources first; only uses 30s previews as absolute last resort.
+ * Always resolves full-length tracks (2-5 minutes). Never plays or downloads 20s/30s preview clips.
  */
 export async function resolveAudioStream(track) {
   // 1. If the track already has a verified full-length stream URL, use it
@@ -162,12 +236,28 @@ export async function resolveAudioStream(track) {
     };
   }
 
-  // 2. Archive.org — always full files
+  // 2. Try Saavn first (High-quality 320k/160k full audio stream)
+  try {
+    const saavnRes = await resolveSaavnStream(track);
+    if (saavnRes && saavnRes.url && !isPreviewUrl(saavnRes.url)) {
+      return saavnRes;
+    }
+  } catch (_) { }
+
+  // 3. Try Audius (Full DRM-free MP3 stream)
+  try {
+    const audiusRes = await resolveAudiusStream(track);
+    if (audiusRes && audiusRes.url && !isPreviewUrl(audiusRes.url)) {
+      return audiusRes;
+    }
+  } catch (_) { }
+
+  // 4. Archive.org — always full files
   if (track.provider === 'archive' || (track.id && track.id.startsWith('archive-'))) {
     return resolveArchive(track);
   }
 
-  // 3. SoundCloud direct (if track is from SC)
+  // 5. SoundCloud direct (if track is from SC)
   if (track.provider === 'soundcloud' || track.transcodingUrl) {
     try {
       return await resolveSoundCloudStream(track);
@@ -176,22 +266,22 @@ export async function resolveAudioStream(track) {
     }
   }
 
-  // 4. YouTube full-length audio stream
+  // 6. YouTube full-length audio stream
   if (track.provider === 'youtube' && track.id && !track.id.startsWith('yt-sug-')) {
     try {
       const ytStream = await resolveYouTube(track);
-      if (ytStream && ytStream.url) return ytStream;
+      if (ytStream && ytStream.url && !isPreviewUrl(ytStream.url)) return ytStream;
     } catch (err) {
       console.warn('YouTube resolve failed:', err.message);
     }
   }
 
-  // 5. SoundCloud full-track search fallback
+  // 7. SoundCloud full-track search fallback
   const searchQ = `${track.artist} - ${track.title}`.replace(/unknown/i, '').trim();
   try {
     const scResults = await searchSoundCloud(searchQ || track.title);
     if (scResults.length > 0) {
-      let candidates = scResults.filter((m) => m.duration && m.duration >= 30);
+      let candidates = scResults.filter((m) => m.duration && m.duration >= 45);
       const targetSec = track.duration;
       if (targetSec && candidates.length) {
         candidates.sort(
@@ -202,7 +292,7 @@ export async function resolveAudioStream(track) {
       for (const match of candidates.slice(0, 3)) {
         try {
           const stream = await resolveSoundCloudStream(match);
-          if (stream && stream.url) return stream;
+          if (stream && stream.url && !isPreviewUrl(stream.url)) return stream;
         } catch (_) { }
       }
     }
@@ -210,7 +300,7 @@ export async function resolveAudioStream(track) {
     console.warn('SoundCloud fallback search failed:', err.message);
   }
 
-  // 6. YouTube search fallback (for non-YT tracks)
+  // 8. YouTube search fallback (for non-YT tracks)
   if (track.provider !== 'youtube') {
     try {
       const ytStream = await resolveYouTube({
@@ -218,21 +308,10 @@ export async function resolveAudioStream(track) {
         provider: 'youtube',
         id: null,
       });
-      if (ytStream && ytStream.url) return ytStream;
+      if (ytStream && ytStream.url && !isPreviewUrl(ytStream.url)) return ytStream;
     } catch (_) { }
   }
 
-  // 7. Absolute last resort — use preview clip so something plays
-  const preview = track.previewUrl || track.streamUrl;
-  if (preview) {
-    console.warn(`[resolveAudioStream] Using preview for "${track.title}" — full stream unavailable`);
-    return {
-      url: preview,
-      mimeType: 'audio/mp4',
-      ext: '.m4a',
-      provider: track.provider || 'preview',
-    };
-  }
-
-  throw new Error(`Unable to find an audio stream for "${track.title}".`);
+  // 9. CRITICAL: Never return 20s/30s preview as a full song stream
+  throw new Error(`Unable to find a full-length audio stream for "${track.title}".`);
 }
