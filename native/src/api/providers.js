@@ -33,7 +33,7 @@ export async function searchITunes(query) {
       duration: r.trackTimeMillis ? Math.round(r.trackTimeMillis / 1000) : undefined,
       provider: 'itunes',
       previewUrl: r.previewUrl,
-      streamUrl: r.previewUrl,
+      streamUrl: null,
     }));
   } catch (err) {
     console.warn('itunes search failed:', err);
@@ -61,7 +61,7 @@ export async function fetchTrendingCharts(country = 'us') {
         cover,
         provider: 'charts',
         previewUrl: preview,
-        streamUrl: preview,
+        streamUrl: null,
       };
     });
   } catch (err) {
@@ -135,12 +135,25 @@ function extOf(name) {
 }
 
 /**
- * Universal Stream Resolver (spotDL Multi-Provider Strategy)
- * Resolves any track (Spotify, YouTube, SoundCloud, iTunes, Archive) to a playable/downloadable audio URL.
+ * Check if a URL is an Apple/Spotify ~30s preview clip
+ */
+function isPreviewUrl(url) {
+  if (!url || typeof url !== 'string') return true;
+  return /\.apple\.com\/.*\/.*\.m4a/i.test(url)
+      || /audio-ak-spotify/i.test(url)
+      || /p\.scdn\.co/i.test(url)
+      || /audio-fa\.scdn\.co/i.test(url)
+      || /preview/i.test(url);
+}
+
+/**
+ * Universal Stream Resolver — Full-Track Priority
+ * Resolves any track to a playable/downloadable audio URL.
+ * Always tries full-length sources first; only uses 30s previews as absolute last resort.
  */
 export async function resolveAudioStream(track) {
-  // 1. Direct stream / preview already present
-  if (track.streamUrl) {
+  // 1. If the track already has a verified full-length stream URL, use it
+  if (track.streamUrl && !isPreviewUrl(track.streamUrl)) {
     return {
       url: track.streamUrl,
       mimeType: 'audio/mp4',
@@ -149,12 +162,12 @@ export async function resolveAudioStream(track) {
     };
   }
 
-  // 2. Archive.org
-  if (track.provider === 'archive' || track.id.startsWith('archive-')) {
+  // 2. Archive.org — always full files
+  if (track.provider === 'archive' || (track.id && track.id.startsWith('archive-'))) {
     return resolveArchive(track);
   }
 
-  // 3. SoundCloud direct
+  // 3. SoundCloud direct (if track is from SC)
   if (track.provider === 'soundcloud' || track.transcodingUrl) {
     try {
       return await resolveSoundCloudStream(track);
@@ -163,7 +176,7 @@ export async function resolveAudioStream(track) {
     }
   }
 
-  // 4. YouTube full-length direct stream (primary for YouTube tracks)
+  // 4. YouTube full-length audio stream
   if (track.provider === 'youtube' && track.id && !track.id.startsWith('yt-sug-')) {
     try {
       const ytStream = await resolveYouTube(track);
@@ -173,7 +186,7 @@ export async function resolveAudioStream(track) {
     }
   }
 
-  // 5. SoundCloud full-track fallback (skips short previews / remixes)
+  // 5. SoundCloud full-track search fallback
   const searchQ = `${track.artist} - ${track.title}`.replace(/unknown/i, '').trim();
   try {
     const scResults = await searchSoundCloud(searchQ || track.title);
@@ -190,33 +203,34 @@ export async function resolveAudioStream(track) {
         try {
           const stream = await resolveSoundCloudStream(match);
           if (stream && stream.url) return stream;
-        } catch (_) {}
+        } catch (_) { }
       }
     }
   } catch (err) {
     console.warn('SoundCloud fallback search failed:', err.message);
   }
 
-  // 6. Try iTunes search for previewUrl
-  try {
-    const itunesMatches = await searchITunes(searchQ || track.title);
-    if (itunesMatches.length > 0 && itunesMatches[0].previewUrl) {
-      return {
-        url: itunesMatches[0].previewUrl,
-        mimeType: 'audio/mp4',
-        ext: '.m4a',
-        provider: 'itunes',
-      };
-    }
-  } catch (_) {}
+  // 6. YouTube search fallback (for non-YT tracks)
+  if (track.provider !== 'youtube') {
+    try {
+      const ytStream = await resolveYouTube({
+        ...track,
+        provider: 'youtube',
+        id: null,
+      });
+      if (ytStream && ytStream.url) return ytStream;
+    } catch (_) { }
+  }
 
-  // 7. Spotify audio preview if available
-  if (track.previewUrl) {
+  // 7. Absolute last resort — use preview clip so something plays
+  const preview = track.previewUrl || track.streamUrl;
+  if (preview) {
+    console.warn(`[resolveAudioStream] Using preview for "${track.title}" — full stream unavailable`);
     return {
-      url: track.previewUrl,
-      mimeType: 'audio/mpeg',
-      ext: '.mp3',
-      provider: 'spotify',
+      url: preview,
+      mimeType: 'audio/mp4',
+      ext: '.m4a',
+      provider: track.provider || 'preview',
     };
   }
 

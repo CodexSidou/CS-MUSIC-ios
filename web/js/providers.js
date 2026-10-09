@@ -64,10 +64,10 @@ export const soundcloud = {
               scClientId = m[1];
               return scClientId;
             }
-          } catch (_) {}
+          } catch (_) { }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     scClientId = SC_FALLBACK_CLIENT_ID;
     return scClientId;
   },
@@ -150,7 +150,7 @@ export const spotify = {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Fallback oEmbed
     const oembed = await jget(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
@@ -193,7 +193,8 @@ export const spotify = {
           album: entity.album?.name || '',
           artwork: bestCover,
           duration: entity.duration ? Math.round(entity.duration / 1000) : -1,
-          streamUrl: entity.audioPreview?.url,
+          streamUrl: null,
+          previewUrl: entity.audioPreview?.url || null,
           saved: false,
         }],
       };
@@ -210,7 +211,8 @@ export const spotify = {
         album: entity.name || '',
         artwork: bestCover,
         duration: item.duration ? Math.round(item.duration / 1000) : -1,
-        streamUrl: item.audioPreview?.url,
+        streamUrl: null,
+        previewUrl: item.audioPreview?.url || null,
         saved: false,
       };
     });
@@ -245,7 +247,7 @@ export const spotify = {
 export const itunes = {
   async search(q) {
     const d = await jget(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=30`);
-    return (d.results || []).filter(r => r.previewUrl).map(r => ({
+    return (d.results || []).filter(r => r.trackName).map(r => ({
       id: 'itunes:' + r.trackId,
       provider: 'itunes',
       title: r.trackName || 'Unknown',
@@ -253,7 +255,8 @@ export const itunes = {
       album: r.collectionName || '',
       artwork: art400(r.artworkUrl100),
       duration: fmtDur((r.trackTimeMillis || 0) / 1000),
-      streamUrl: r.previewUrl,
+      streamUrl: null,
+      previewUrl: r.previewUrl || null,
       saved: false
     }));
   },
@@ -265,7 +268,7 @@ export const itunes = {
       if (!ids.length) return [];
       const look = await jget(`https://itunes.apple.com/lookup?id=${ids.join(',')}`);
       const byId = {};
-      for (const r of (look.results || [])) if (r.previewUrl) byId[String(r.trackId)] = r;
+      for (const r of (look.results || [])) if (r.trackName) byId[String(r.trackId)] = r;
       const out = [];
       for (const id of ids) {
         const r = byId[id];
@@ -278,7 +281,8 @@ export const itunes = {
           album: r.collectionName || '',
           artwork: art400(r.artworkUrl100),
           duration: fmtDur((r.trackTimeMillis || 0) / 1000),
-          streamUrl: r.previewUrl,
+          streamUrl: null,
+          previewUrl: r.previewUrl || null,
           saved: false
         });
       }
@@ -307,7 +311,7 @@ export const audius = {
           audiusId: x.id,
           saved: false
         }));
-      } catch (_) {}
+      } catch (_) { }
     }
     return [];
   },
@@ -328,7 +332,7 @@ export const audius = {
           audiusId: x.id,
           saved: false
         }));
-      } catch (_) {}
+      } catch (_) { }
     }
     return [];
   }
@@ -356,7 +360,7 @@ export const youtube = {
             };
           });
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Suggestions fallback
@@ -394,7 +398,7 @@ export const youtube = {
           const best = streams.find(s => (s.mimeType || '').includes('audio')) || streams[0];
           return best.proxyUrl || best.url;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     for (const base of INVIDIOUS_INSTANCES) {
@@ -404,7 +408,7 @@ export const youtube = {
         if (streams.length > 0) {
           return streams[0].url;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     throw new Error('No YouTube stream found');
@@ -444,44 +448,71 @@ export const archive = {
 };
 
 /**
- * Universal Stream Resolver (spotDL Multi-tier Strategy for PWA)
+ * Check if a URL is an Apple/Spotify ~30s preview clip
+ */
+function isPreviewUrl(url) {
+  if (!url || typeof url !== 'string') return true;
+  return /\.apple\.com\/.*\/.*\.m4a/i.test(url)
+      || /audio-ak-spotify/i.test(url)
+      || /p\.scdn\.co/i.test(url)
+      || /audio-fa\.scdn\.co/i.test(url)
+      || /preview/i.test(url);
+}
+
+/**
+ * Universal Stream Resolver — Full-Track Priority
+ * 
+ * Strategy: always try full-length sources first (SoundCloud, YouTube,
+ * Archive, Audius). Only fall back to 30s previews if everything else fails.
  */
 export async function resolveStream(track) {
+  // Local file — always full
   if (track.file) return URL.createObjectURL(track.file);
-  if (track.streamUrl) return track.streamUrl;
+
+  // If the track already has a resolved full-length stream URL, use it
+  if (track.streamUrl && !isPreviewUrl(track.streamUrl)) {
+    return track.streamUrl;
+  }
 
   const searchQ = `${track.artist} - ${track.title}`.replace(/unknown/i, '').trim();
 
-  // 1. Try SoundCloud first (full progressive MP3 streams)
+  // 1. Audius — tracks have full direct stream URLs
+  if (track.provider === 'audius' && track.streamUrl) {
+    return track.streamUrl;
+  }
+
+  // 2. SoundCloud — full progressive MP3 streams
   try {
     const scStream = await soundcloud.resolve(track);
     if (scStream) return scStream;
-  } catch (_) {}
+  } catch (_) { }
 
-  // 2. Try YouTube / Piped / Invidious
+  // 3. YouTube / Piped / Invidious — full audio streams
   try {
     const ytStream = await youtube.resolve(track);
     if (ytStream) return ytStream;
-  } catch (_) {}
+  } catch (_) { }
 
-  // 3. Try iTunes preview
-  try {
-    const itunesMatches = await itunes.search(searchQ || track.title);
-    if (itunesMatches.length > 0 && itunesMatches[0].streamUrl) {
-      return itunesMatches[0].streamUrl;
-    }
-  } catch (_) {}
-
-  // 4. Try Archive.org
+  // 4. Archive.org — full MP3 files
   if (track.provider === 'archive' || track.archId) {
     try {
       return await archive.resolve(track);
-    } catch (_) {}
+    } catch (_) { }
   }
 
-  // 5. Try Audius
-  if (track.provider === 'audius') {
-    return track.streamUrl;
+  // 5. Last resort: search other full-track providers
+  try {
+    const audiusResults = await audius.search(searchQ || track.title);
+    if (audiusResults.length > 0 && audiusResults[0].streamUrl) {
+      return audiusResults[0].streamUrl;
+    }
+  } catch (_) { }
+
+  // 6. Absolute last resort — use the preview clip so something plays
+  const preview = track.previewUrl || track.streamUrl;
+  if (preview) {
+    console.warn(`[resolveStream] Using preview URL for "${track.title}" — full stream unavailable`);
+    return preview;
   }
 
   throw new Error(`Unable to resolve stream for "${track.title}"`);
@@ -494,7 +525,7 @@ export async function fetchWithProgress(url, onProgress) {
   const reader = r.body.getReader();
   const chunks = [];
   let got = 0;
-  for (;;) {
+  for (; ;) {
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
