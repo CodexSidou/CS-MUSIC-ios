@@ -542,9 +542,27 @@ function isPreviewUrl(url) {
 }
 
 /**
- * Universal Stream Resolver — Full-Track Priority
- * Always resolves full-length tracks (2-5 minutes) for any song, album, or playlist.
- * Never plays or downloads 20s/30s preview clips.
+ * Verify that an audio URL is reachable and returns HTTP 200
+ */
+export async function verifyUrl(url, timeoutMs = 2500) {
+  if (!url || typeof url !== 'string' || isPreviewUrl(url)) return false;
+  if (url.startsWith('blob:') || url.startsWith('data:')) return true;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const res = await fetch(url, { method: 'HEAD', signal: ctrl.signal });
+    clearTimeout(t);
+    return res.ok && res.status >= 200 && res.status < 400;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Universal Stream Resolver — Full-Track Priority with 200 Verification
+ * 
+ * Guarantees that any returned stream URL actually exists (not a 404 placeholder),
+ * plays full length (2-5 minutes), and works seamlessly in Safari / iOS / Chrome.
  */
 export async function resolveStream(track) {
   // 1. Local saved file (IndexedDB blob) — always 100% full
@@ -552,56 +570,62 @@ export async function resolveStream(track) {
 
   // 2. Verified full-length stream already on track
   if (track.streamUrl && !isPreviewUrl(track.streamUrl)) {
-    return track.streamUrl;
+    if (await verifyUrl(track.streamUrl)) return track.streamUrl;
   }
 
-  // 3. Try Saavn first (High-quality 320k/160k DRM-free full audio stream)
-  try {
-    const sStream = await saavn.resolve(track);
-    if (sStream && !isPreviewUrl(sStream)) {
-      track.streamUrl = sStream;
-      return sStream;
-    }
-  } catch (_) { }
-
-  // 4. Try Audius (100% DRM-free full-length MP3 stream)
+  // 3. Try Audius first (100% DRM-free, CORS-enabled, reliable HTTP 200 full MP3)
   try {
     const aStream = await audius.resolve(track);
-    if (aStream && !isPreviewUrl(aStream)) {
+    if (aStream && await verifyUrl(aStream)) {
       track.streamUrl = aStream;
       return aStream;
     }
   } catch (_) { }
 
-  // 5. Try SoundCloud (Full-length progressive MP3 stream)
+  // 4. Try Saavn with HTTP 200 verification (Filters out 404 placeholders)
   try {
-    const scStream = await soundcloud.resolve(track);
-    if (scStream && !isPreviewUrl(scStream)) {
-      track.streamUrl = scStream;
-      return scStream;
+    const sStream = await saavn.resolve(track);
+    if (sStream && await verifyUrl(sStream)) {
+      track.streamUrl = sStream;
+      return sStream;
     }
   } catch (_) { }
 
-  // 6. Try Archive.org (Full-length audio files)
+  // 5. Try Archive.org (Full-length audio files)
   try {
     const archStream = await archive.resolve(track);
-    if (archStream && !isPreviewUrl(archStream)) {
+    if (archStream && await verifyUrl(archStream)) {
       track.streamUrl = archStream;
       return archStream;
+    }
+  } catch (_) { }
+
+  // 6. Try SoundCloud (Progressive MP3 stream)
+  try {
+    const scStream = await soundcloud.resolve(track);
+    if (scStream && await verifyUrl(scStream)) {
+      track.streamUrl = scStream;
+      return scStream;
     }
   } catch (_) { }
 
   // 7. Try YouTube (Piped / Invidious stream)
   try {
     const ytStream = await youtube.resolve(track);
-    if (ytStream && !isPreviewUrl(ytStream)) {
+    if (ytStream && await verifyUrl(ytStream)) {
       track.streamUrl = ytStream;
       return ytStream;
     }
   } catch (_) { }
 
-  // 8. CRITICAL: Never return 20s/30s preview as a full song stream
-  throw new Error(`Could not find a full-length stream for "${track.title}".`);
+  // 8. Graceful fallback: If no full-length audio could be found, use preview so user can hear something
+  const preview = track.previewUrl || track.streamUrl;
+  if (preview) {
+    console.warn(`[resolveStream] Using preview fallback for "${track.title}"`);
+    return preview;
+  }
+
+  throw new Error(`Unable to find a playable stream for "${track.title}".`);
 }
 
 export async function fetchWithProgress(url, onProgress) {

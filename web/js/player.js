@@ -21,6 +21,13 @@ export const player = {
 
   async playTracks(tracks, startIndex = 0) {
     if (!tracks || !tracks.length) return;
+    // Prime / unlock audio element synchronously during user gesture for iOS Safari
+    const m = media();
+    if (m && m.paused && !m.src) {
+      try {
+        m.play().catch(() => {});
+      } catch (_) { }
+    }
     this.queue = tracks.slice();
     this.index = Math.max(0, Math.min(startIndex, this.queue.length - 1));
     await this._loadCurrent(true);
@@ -53,8 +60,17 @@ export const player = {
       m.src = src;
       if (src.startsWith('blob:')) this.objectUrls.push(src);
       m.load();
-      await m.play();
-      this.playing = true;
+      try {
+        await m.play();
+        this.playing = true;
+      } catch (playErr) {
+        if (playErr && playErr.name === 'NotAllowedError') {
+          // iOS Safari paused — ready to play on next tap
+          this.playing = false;
+        } else {
+          throw playErr;
+        }
+      }
       this._consecErrors = 0;
       this._touchHistory(track);
       this._bindSession(track);
